@@ -1,0 +1,14 @@
+# secrets
+.env
+
+# personal data. Never commit these to a public repo.
+data/profile_facts.json
+data/search_criteria.json
+
+# generated
+data/*.db
+data/output/
+__pycache__/
+*.pyc
+.venv/
+.DS_Store

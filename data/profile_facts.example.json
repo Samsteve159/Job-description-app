@@ -1,0 +1,81 @@
+{
+  "meta": {
+    "note": "Template. Copy to profile_facts.json and fill in with your own career. That file is gitignored and never committed.",
+    "scope_constraint": "State any constraint that must never be violated, for example no team-leadership claims if you work solo.",
+    "confidentiality": "Client names withheld. Use descriptors only."
+  },
+  "facts": [
+    {
+      "kind": "name",
+      "text": "Your Name"
+    },
+    {
+      "kind": "contact",
+      "text": "you@example.com",
+      "order_index": 0
+    },
+    {
+      "kind": "contact",
+      "text": "linkedin.com/in/your-handle",
+      "order_index": 1
+    },
+    {
+      "kind": "contact",
+      "text": "City, Country",
+      "order_index": 2
+    },
+    {
+      "kind": "role",
+      "org": "Employer Name",
+      "text": "Your Job Title",
+      "date_from": "Mon YYYY",
+      "date_to": "Present",
+      "tags": [
+        "domain",
+        "function"
+      ],
+      "children": [
+        {
+          "kind": "bullet",
+          "text": "One achievement, outcome first. Keep every figure exactly as it really was.",
+          "tags": [
+            "keyword",
+            "keyword"
+          ],
+          "metrics": {
+            "finding": "$0.0M"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "education",
+      "org": "Institution",
+      "text": "Degree",
+      "date_from": "Mon YYYY",
+      "date_to": "Mon YYYY"
+    },
+    {
+      "kind": "cert",
+      "org": "Issuer",
+      "text": "Certification name",
+      "date_from": "Mon YYYY"
+    },
+    {
+      "kind": "skill",
+      "text": "A skill",
+      "tags": [
+        "tag"
+      ]
+    },
+    {
+      "kind": "answer",
+      "text": "Answer to a recurring screening question.",
+      "tags": [
+        "notice period"
+      ],
+      "verified": false,
+      "source": "CONFIRM: anything unverified is withheld from citation until you set this true."
+    }
+  ]
+}
