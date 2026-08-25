@@ -8,6 +8,35 @@ Then `SPEC.md` for what it does and `DECISIONS.md` for why it is shaped this way
 Patterns are borrowed from an earlier system of Sameer's (FastAPI + SQLite + APScheduler
 + LLM + human approval gate). That project is not a dependency and is not read at runtime.
 
+## Committing. Do this without being asked.
+
+**At the end of every session, and whenever Sameer says pause, stop or we are done:
+stage, commit and push.** He has standing authorisation for this, so do not ask first.
+
+```bash
+git add -A
+git commit -m "<what changed and why, not a file list>"
+git push
+```
+
+Remote is `git@github.com:Samsteve159/Job-description-app.git` (private). SSH is already
+working. Commit identity is set locally to the GitHub noreply address, so his real email
+stays out of the log. Do not change it to the global config.
+
+**Always scan before committing.** The repo is private now, but `data/profile_facts.json`
+holds his email, phone and career figures, and `.env` holds a live key. Both are gitignored;
+verify rather than trust:
+
+```bash
+git diff --cached --name-only | grep -xE "\.env|data/profile_facts\.json|data/search_criteria\.json|data/job_app\.db"
+git grep --cached -nE "nvapi-[A-Za-z0-9_-]{20,}|sk-ant-[A-Za-z0-9_-]{20,}"
+```
+
+Either returning a hit means stop and fix before committing.
+
+Write the commit message as prose explaining the change and the reasoning. `git diff` already
+lists the files.
+
 ## Scope boundary
 
 **This directory is the whole project.** Do not read from, write to, or reference anything
