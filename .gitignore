@@ -12,3 +12,7 @@ __pycache__/
 *.pyc
 .venv/
 .DS_Store
+
+# Gmail OAuth client and the live token beside it
+data/gmail_client.json
+data/gmail_token.json
