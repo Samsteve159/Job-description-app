@@ -1,0 +1,287 @@
+"""Gap closer: the override, and the one shape it is allowed to take.
+
+The truth gate exists to stop a *model* inventing experience. It was never meant to stop
+*Sameer* recording true things about his own career, and it had started to. The word
+"risk" appears in none of his 63 facts, so every risk keyword reads as a gap, on a record
+belonging to somebody who ran multi-banking treasury operations at an energy company for
+three and a half years. The likeliest reading is that the record under-describes the work,
+not that the work never happened.
+
+So the override runs in the only direction that is honest: it does not let a keyword onto
+the page unevidenced, it asks him a question and turns his answer into evidence. The model
+writes the question. He writes the answer. Nothing is saved that he has not typed or
+edited himself, and every fact created this way is stamped so it can be found again.
+
+**Closeability is computed, not asked of a model.** A model asked "could Sameer plausibly
+claim this?" will say yes to almost anything, which is the failure this whole app is built
+against. Adjacency to his existing record is arithmetic:
+
+  likely      the keyword's words already appear across several of his facts
+  maybe       one fact touches it
+  unlikely    nothing in the record is near it
+
+`unlikely` gets no question and no draft. "Product owner" against a record with no product
+work is not a gap to close, it is a job that does not fit, and the useful thing to tell
+him is that rather than a prompt inviting him to stretch.
+"""
+from __future__ import annotations
+
+import json
+import logging
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Sequence
+
+from config import config
+from modules import keywords as kw
+from modules.llm import LLMError, complete_json
+from modules.prompts import HOUSE_STYLE, TRUTH_CONTRACT
+
+log = logging.getLogger(__name__)
+
+SEED_FILE = config.base_dir / "data" / "profile_facts.json"
+
+# how many of his facts a keyword's words have to touch before it is worth asking about
+LIKELY_TOUCHES = 2
+
+_SYSTEM = f"""You help someone describe work they have already done, in language a job
+description would recognise. You are writing a QUESTION, never a claim.
+
+{TRUTH_CONTRACT}
+
+{HOUSE_STYLE}
+
+The person is being asked about a term a job wants that their CV does not currently
+contain. You are shown the parts of their record that sit closest to it.
+
+Rules that matter more than being helpful:
+- Ask about what they DID. Never suggest what they might say
+- If the nearby facts do not really touch the term, say so in `honest_read` and set
+  `worth_asking` to false. A question that invites someone to stretch is worse than no
+  question
+- The draft is a SHAPE, not a claim: a sentence with the specifics left blank for them to
+  fill in. Never invent a number, a system name, a client or a scale
+- One question. Specific enough to answer in a sentence, not "tell me about risk"
+
+Return JSON only, no prose, no code fence:
+{{"worth_asking": true|false,
+  "question": "one specific question about what they actually did",
+  "why": "one line on why this job cares about it",
+  "draft": "a sentence shape with ... where their specifics go",
+  "honest_read": "one line: what the record does and does not show"}}"""
+
+
+@dataclass
+class Suggestion:
+    keyword: str
+    closeability: str                       # likely | maybe | unlikely
+    nearby: List[Dict[str, Any]] = field(default_factory=list)
+    question: str = ""
+    why: str = ""
+    draft: str = ""
+    honest_read: str = ""
+    worth_asking: bool = False
+
+    def as_dict(self) -> Dict[str, Any]:
+        return {
+            "keyword": self.keyword, "closeability": self.closeability,
+            "nearby": self.nearby, "question": self.question, "why": self.why,
+            "draft": self.draft, "honest_read": self.honest_read,
+            "worth_asking": self.worth_asking,
+        }
+
+
+def adjacency(keyword: str, facts: Sequence[Any]) -> List[Any]:
+    """Facts whose words overlap the keyword's. Deterministic, no model, no opinion."""
+    wanted = set(kw.significant(keyword))
+    if not wanted:
+        return []
+    scored = []
+    for fact in facts:
+        if not getattr(fact, "verified", True):
+            continue
+        overlap = wanted & set(kw.tokens(_text_of(fact)))
+        if overlap:
+            scored.append((len(overlap), len(getattr(fact, "text", "") or ""), fact))
+    # most overlap first, then the longer fact, which carries more for him to react to
+    scored.sort(key=lambda row: (-row[0], -row[1]))
+    return [row[2] for row in scored]
+
+
+def _text_of(fact: Any) -> str:
+    tags = getattr(fact, "tags", None) or []
+    return " ".join([
+        getattr(fact, "text", "") or "",
+        getattr(fact, "org", "") or "",
+        " ".join(str(t) for t in tags) if isinstance(tags, (list, tuple)) else "",
+    ])
+
+
+def closeability(keyword: str, facts: Sequence[Any]) -> str:
+    near = adjacency(keyword, facts)
+    if len(near) >= LIKELY_TOUCHES:
+        return "likely"
+    return "maybe" if near else "unlikely"
+
+
+def suggest_one(keyword: str, facts: Sequence[Any], role: str = "") -> Suggestion:
+    """One gap, with a question if the record is anywhere near it."""
+    near = adjacency(keyword, facts)[:5]
+    grade = closeability(keyword, facts)
+    nearby = [{"id": f.id, "text": (f.text or "")[:220], "org": getattr(f, "org", None)}
+              for f in near]
+
+    if grade == "unlikely":
+        return Suggestion(
+            keyword=keyword, closeability=grade, nearby=[],
+            worth_asking=False,
+            honest_read=("Nothing in your record is near this. That is not a gap to "
+                         "close, it is a genuine part of the job you have not done."),
+        )
+
+    listed = "\n".join(f"[{n['id']}] {n['text']}" for n in nearby) or "nothing close"
+    user = (
+        f"TERM THE JOB WANTS: {keyword}\n"
+        f"ROLE BEING APPLIED FOR: {role or 'unspecified'}\n\n"
+        f"CLOSEST THINGS ALREADY IN THEIR RECORD:\n{listed}\n\n"
+        f"Ask them one question about what they actually did."
+    )
+    try:
+        data = complete_json("gaps", system=_SYSTEM, user=user,
+                             max_tokens=900, temperature=0.2)
+    except (LLMError, RuntimeError) as exc:
+        log.warning("gap suggestion failed for %r: %s", keyword, exc)
+        return Suggestion(keyword=keyword, closeability=grade, nearby=nearby,
+                          worth_asking=False,
+                          honest_read="Could not reach the model to draft a question.")
+
+    if not isinstance(data, dict):
+        return Suggestion(keyword=keyword, closeability=grade, nearby=nearby,
+                          worth_asking=False, honest_read="No usable answer from the model.")
+
+    return Suggestion(
+        keyword=keyword,
+        closeability=grade,
+        nearby=nearby,
+        worth_asking=bool(data.get("worth_asking")),
+        question=str(data.get("question") or "").strip(),
+        why=str(data.get("why") or "").strip(),
+        draft=str(data.get("draft") or "").strip(),
+        honest_read=str(data.get("honest_read") or "").strip(),
+    )
+
+
+def suggest(gaps: Sequence[str], facts: Sequence[Any], role: str = "",
+            limit: int = 6) -> List[Suggestion]:
+    """Rank gaps by how closeable they are, then ask about the closeable ones.
+
+    Ranked before it is capped, so the cap drops the ones he could do least about rather
+    than whichever the job happened to list last.
+    """
+    order = {"likely": 0, "maybe": 1, "unlikely": 2}
+    ranked = sorted(dict.fromkeys(gaps), key=lambda g: order[closeability(g, facts)])
+
+    out: List[Suggestion] = []
+    for keyword in ranked[:limit]:
+        out.append(suggest_one(keyword, facts, role))
+    dropped = len(ranked) - len(out)
+    if dropped > 0:
+        log.info("gap closer: %d further gap(s) not asked about this round", dropped)
+    return out
+
+
+# --------------------------------------------------------------- writing it back
+
+def add_fact(text: str, *, parent_org: Optional[str] = None, tags: Optional[List[str]] = None,
+             kind: str = "bullet", source: str = "gap closer",
+             seed_file: Optional[Path] = None) -> Dict[str, Any]:
+    """Append a fact he has attested to, to the JSON, which is the source of truth.
+
+    Written to the file rather than only to SQLite because `seed_profile.py` wipes and
+    reloads ProfileFact. A fact that existed only in the database would survive until the
+    next re-seed and then vanish, which is the same trap contact details fell into.
+
+    Marked `source` so anything added this way can be found later, and `verified` true
+    because he typed it. That flag records who vouched for a fact, and he is allowed to
+    vouch for his own career.
+    """
+    text = (text or "").strip()
+    if not text:
+        raise ValueError("a fact cannot be empty")
+    if len(text) < 12:
+        raise ValueError("that is too short to be a fact. Say what you did")
+
+    path = seed_file or SEED_FILE
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    entries = payload["facts"]
+
+    entry = {
+        "kind": kind,
+        "text": text,
+        "tags": tags or [],
+        "source": source,
+        "verified": True,
+    }
+
+    if parent_org:
+        for candidate in entries:
+            if candidate.get("kind") == "role" and candidate.get("org") == parent_org:
+                candidate.setdefault("children", []).append(entry)
+                break
+        else:
+            raise ValueError(f"no role on file for {parent_org!r}")
+    else:
+        entries.append(entry)
+
+    path.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n",
+                    encoding="utf-8")
+    log.info("fact added to %s under %s: %r", path.name, parent_org or "top level", text[:70])
+    return entry
+
+
+def roles(facts: Sequence[Any]) -> List[str]:
+    """Employers a new fact can be attached to, in the order they appear on the resume."""
+    seen: List[str] = []
+    for fact in sorted(facts, key=lambda f: getattr(f, "order_index", 0)):
+        if getattr(fact, "kind", None) == "role" and fact.org and fact.org not in seen:
+            seen.append(fact.org)
+    return seen
+
+
+def save_answer(db: Any, text: str, *, org: Optional[str] = None,
+                tags: Optional[List[str]] = None, keyword: Optional[str] = None) -> Any:
+    """Write an attested fact to the JSON and into the live database.
+
+    Both, in that order. The JSON is the source of truth and survives a re-seed; the row
+    is what makes the fact usable in the next tailoring run without restarting anything.
+    If the file write fails, nothing is inserted, so the two cannot drift apart.
+    """
+    from database.models import ProfileFact       # imported here to keep gaps importable
+
+    tags = list(tags or [])
+    if keyword and keyword.lower() not in [t.lower() for t in tags]:
+        tags.append(keyword.lower())
+
+    add_fact(text, parent_org=org, tags=tags, kind="bullet", source="gap closer")
+
+    parent = None
+    if org:
+        parent = db.query(ProfileFact).filter(
+            ProfileFact.kind == "role", ProfileFact.org == org).first()
+
+    highest = db.query(ProfileFact).order_by(ProfileFact.order_index.desc()).first()
+    row = ProfileFact(
+        kind="bullet",
+        parent_id=parent.id if parent else None,
+        org=org,
+        text=text.strip(),
+        tags=tags,
+        metrics={},
+        source="gap closer",
+        verified=True,
+        order_index=(highest.order_index + 1) if highest else 0,
+    )
+    db.add(row)
+    db.commit()
+    log.info("attested fact saved: #%d under %s", row.id, org or "no role")
+    return row

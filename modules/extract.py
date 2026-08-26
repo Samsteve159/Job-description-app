@@ -72,13 +72,32 @@ class Extraction:
     comp_hints: Optional[str] = None
     notes: Optional[str] = None
     jd_text: str = ""
+    # Derived from where terms sit in the posting rather than from the model's own
+    # must/nice split, which is not steady enough to be a scoring denominator.
+    scored_must: List[str] = field(default_factory=list)
+    scored_nice: List[str] = field(default_factory=list)
 
     @property
     def all_requirements(self) -> List[Requirement]:
         return self.must + self.nice
 
     def must_keywords(self) -> List[str]:
+        """What the ATS gate scores against.
+
+        Prefers the set derived from the posting's own structure. The model's per
+        requirement keywords are the fallback, used when a posting has no headings to
+        read, and they are the reason this exists: the same Wells Fargo description
+        produced eighteen must-haves on one run and three on the next, so a resume passed
+        or failed on which reading the model took that afternoon.
+        """
+        if self.scored_must:
+            return list(self.scored_must)
         return [r.keyword for r in self.must if r.keyword]
+
+    def nice_keywords(self) -> List[str]:
+        if self.scored_nice:
+            return list(self.scored_nice)
+        return [r.keyword for r in self.nice if r.keyword]
 
     def as_dict(self) -> Dict[str, Any]:
         return asdict(self)
@@ -212,6 +231,20 @@ def extract(jd_text: str) -> Extraction:
     if dropped:
         log.info("extract: dropped %d unusable keyword(s): %s",
                  len(dropped), ", ".join(dropped[:8]))
+
+    # Now the part that does not depend on the model's judgement at all. Every candidate
+    # term is placed against the posting's own structure: mentioned in the required half
+    # or only under "preferred", and how often. The posting does not change between runs.
+    candidates = list(result.keywords) + [r.keyword for r in result.all_requirements
+                                          if r.keyword]
+    result.scored_must, result.scored_nice = keyword_tools.split_by_emphasis(
+        jd_text, candidates)
+    if result.scored_must:
+        log.info("extract: %d must-have keyword(s) derived from the posting: %s",
+                 len(result.scored_must), ", ".join(result.scored_must))
+    else:
+        log.warning("extract: no headings found to read emphasis from, falling back to "
+                    "the model's own must/nice split for %r", result.title or "this job")
 
     if not result.must:
         log.warning(

@@ -206,6 +206,36 @@ with TestClient(app) as client:
     r = client.get(f"/job/writer/{pid}/download", follow_redirects=False)
     check("unticking closes the export again", r.status_code == 303, r.status_code)
 
+    print("\ngap closer")
+    # SEED_FILE is redirected so a test can never append to the real career record.
+    import json as _json, tempfile as _tf
+    from modules import gaps as _gaps
+    _seed = Path(_tf.mkdtemp(prefix="jobapp-seed-")) / "facts.json"
+    _seed.write_text(_json.dumps({"meta": {}, "facts": [
+        {"kind": "role", "org": "Purchasing Index", "text": "Data Analyst",
+         "children": []}]}), encoding="utf-8")
+    _gaps.SEED_FILE = _seed
+
+    r = client.get(f"/job/writer/{pid}")
+    check("the review screen offers to close gaps", "Ask me about the gaps" in r.text)
+
+    r = client.post(f"/job/writer/{pid}/gaps/save",
+                    data={"text": "Monitored FX exposure across the account structure.",
+                          "org": "Purchasing Index", "keyword": "treasury risk"},
+                    follow_redirects=True)
+    check("an answer is accepted", "Saved to your record" in r.text, r.status_code)
+    saved = _json.loads(_seed.read_text(encoding="utf-8"))
+    check("it reaches the JSON, not only the database",
+          len(saved["facts"][0]["children"]) == 1, saved)
+    check("it is marked as attested",
+          saved["facts"][0]["children"][0]["verified"] is True)
+
+    r = client.post(f"/job/writer/{pid}/gaps/save", data={"text": "no", "org": ""},
+                    follow_redirects=True)
+    check("a too-short answer is refused in a modal", 'class="modal"' in r.text)
+    saved = _json.loads(_seed.read_text(encoding="utf-8"))
+    check("and nothing was written", len(saved["facts"][0]["children"]) == 1)
+
     print("\ndetails")
     r = client.post("/job/details/set", data={"kind": "phone", "value": "+91 98200 12345"},
                     follow_redirects=True)

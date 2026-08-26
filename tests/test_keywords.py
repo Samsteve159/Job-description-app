@@ -19,9 +19,9 @@ from types import SimpleNamespace
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from modules.keywords import (MAX_SKILLS, canonical, find_evidence,  # noqa: E402
-                              place, sanitise, significant, unsupported,
-                              usable_keyword)
+from modules.keywords import (MAX_SKILLS, _sections, canonical,  # noqa: E402
+                              find_evidence, place, sanitise, significant,
+                              split_by_emphasis, unsupported, usable_keyword)
 
 passed = failed = 0
 
@@ -166,6 +166,58 @@ check("a job the record covers does not", not p.is_a_stretch)
 
 check("as_dict survives a round trip through JSON",
       isinstance(p.as_dict()["added"], list) and "summary" in p.as_dict())
+
+print("\nreading emphasis out of the posting")
+# extract classified must and nice itself and was not steady about it: the same Wells
+# Fargo description produced eighteen must-have requirements on one run and three on the
+# next. The ATS gate scores against that set, so its denominator was moving and a resume
+# passed or failed on which reading the model happened to take. The posting does not move.
+JD = """Manager, Procurement Analytics
+
+Responsibilities
+Own spend analysis across categories and build the reporting layer in Power BI.
+Audit supplier categorisation against UNSPSC taxonomy.
+
+Required
+Advanced SQL for data transformation.
+Hands-on experience with UNSPSC taxonomy.
+
+Nice to have
+Python for data pipelines.
+Machine learning applied to spend classification.
+"""
+CANDIDATES = ["sql", "unspsc", "power bi", "python", "machine learning",
+              "spend analysis", "kubernetes"]
+
+required, optional = _sections(JD)
+check("the optional half is found", "Nice to have" in optional, optional[:40])
+check("and it is not also counted as required", "Nice to have" not in required)
+check("required content stays in the required half", "Advanced SQL" in required)
+check("optional content leaves the required half", "Python for data" not in required)
+
+must, nice = split_by_emphasis(JD, CANDIDATES)
+check("a term under Required is a must", "sql" in must, must)
+check("a term in the responsibilities is a must", "spend analysis" in must, must)
+check("a term only under Nice to have is not a must", "python" not in must, must)
+check("and it lands in nice instead", "python" in nice, nice)
+check("machine learning follows the same path", "machine learning" in nice, nice)
+check("a term the posting never mentions appears nowhere",
+      "kubernetes" not in must and "kubernetes" not in nice, (must, nice))
+check("a term in both halves counts as required", "unspsc" in must, must)
+
+again = split_by_emphasis(JD, CANDIDATES)
+check("the same posting gives the same answer every time", again == (must, nice))
+check("candidate order does not change the outcome",
+      split_by_emphasis(JD, list(reversed(CANDIDATES)))[0] == must,
+      split_by_emphasis(JD, list(reversed(CANDIDATES)))[0])
+
+capped, _ = split_by_emphasis(JD, CANDIDATES, limit=2)
+check("the cap keeps the most emphasised", len(capped) == 2, capped)
+
+plain, plain_nice = split_by_emphasis("Just prose about SQL with no headings at all.",
+                                      ["sql"])
+check("a posting with no headings puts everything in must",
+      plain == ["sql"] and plain_nice == [], (plain, plain_nice))
 
 print(f"\n{passed} passed, {failed} failed")
 raise SystemExit(1 if failed else 0)

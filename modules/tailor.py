@@ -435,7 +435,7 @@ def tailor(extraction: Any, facts: Sequence[Any]) -> TailorResult:
     result.placement = keywords.place(
         written,
         must=extraction.must_keywords(),
-        nice=[r.keyword for r in extraction.nice if r.keyword],
+        nice=extraction.nice_keywords(),
         facts=citable,
         skills=current_skills,
     )

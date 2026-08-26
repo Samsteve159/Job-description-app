@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import json
 import logging
+import time
 import re
 from typing import Any, Dict, Optional, Tuple
 
@@ -37,9 +38,36 @@ def _split_route(route: str) -> Tuple[str, str]:
 
 # ------------------------------------------------------------------------- providers
 
+# A 429 from NIM's free tier means "not yet", not "no". Falling straight through to the
+# paid fallback on a rate limit turns a free stack into a billed one for a condition that
+# clears in seconds, and the gap closer proved it: six questions, six 429s, six PAID CALL
+# warnings. Waiting is the correct response to being asked to wait.
+_RATE_LIMIT_BACKOFF = (2.0, 5.0, 12.0)
+
+
 def _call_nim(model: str, system: str, user: str, max_tokens: int, temperature: float) -> str:
     if not config.nim_api_key:
         raise LLMError("NIM_API_KEY is not set")
+
+    for attempt, pause in enumerate(_RATE_LIMIT_BACKOFF + (None,)):
+        try:
+            return _nim_once(model, system, user, max_tokens, temperature)
+        except _RateLimited as exc:
+            if pause is None:
+                raise LLMError(
+                    f"NIM rate limited after {len(_RATE_LIMIT_BACKOFF)} retries: {exc}"
+                ) from exc
+            log.info("NIM rate limited on %s, waiting %.0fs (retry %d of %d)",
+                     model, pause, attempt + 1, len(_RATE_LIMIT_BACKOFF))
+            time.sleep(pause)
+    raise LLMError("unreachable")
+
+
+class _RateLimited(Exception):
+    """NIM said try later. Internal: never escapes _call_nim."""
+
+
+def _nim_once(model: str, system: str, user: str, max_tokens: int, temperature: float) -> str:
     resp = httpx.post(
         f"{config.nim_base_url.rstrip('/')}/chat/completions",
         headers={
@@ -57,6 +85,8 @@ def _call_nim(model: str, system: str, user: str, max_tokens: int, temperature: 
         },
         timeout=_TIMEOUT,
     )
+    if resp.status_code == 429:
+        raise _RateLimited(resp.text[:120])
     if resp.status_code >= 400:
         raise LLMError(f"NIM HTTP {resp.status_code}: {resp.text[:300]}")
     data = resp.json()

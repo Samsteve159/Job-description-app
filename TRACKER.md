@@ -21,16 +21,24 @@ running `scripts/probe_models.py` against the live key, not from a published lis
 
 | Stage | Model | Why |
 |---|---|---|
-| `score` | `minimaxai/minimax-m3` | Highest volume. Fastest usable model on the probe |
-| `extract` | `minimaxai/minimax-m3` | 2.6s. Got seniority, all must-haves and 15 keywords right |
+| `score` | `openai/gpt-oss-20b` | Highest volume, and about a second a call |
+| `extract` | `openai/gpt-oss-120b` | Sets the candidate terms every later stage is measured against |
 | `tailor` | `openai/gpt-oss-120b` | 3.2s. Fastest model that held the citation shape on the hard task |
 | `cover` | `openai/gpt-oss-120b` | Prose quality still untested. Bake off before trusting it |
-| `screening` | `minimaxai/minimax-m3` | Short answers |
-| `brief` | `minimaxai/minimax-m3` | Question generation from a JD |
+| `screening` | `openai/gpt-oss-20b` | Short answers |
+| `brief` | `openai/gpt-oss-20b` | Question generation from a JD |
+| `gaps` | `openai/gpt-oss-120b` | Structured JSON with a judgement in it. The 20b model returned empty responses |
 | fallback | `anthropic:claude-sonnet-5` | **Paid.** Fires only on a NIM failure. Logged at WARNING with the word PAID |
 
 `nvidia/nemotron-3-super-120b-a12b` is configured as `NIM_BIG`, unused, kept as a bake-off
 candidate.
+
+**`minimaxai/minimax-m3` is gone from every route.** It was the right pick on the probe,
+2.6s and correct, and is now rate limited to the point of being unavailable: 0 of 4 calls
+answered, while both gpt-oss models answered 4 of 4 in about a second. Availability beats
+benchmark scores. `modules/llm.py` now backs off on a 429 rather than falling straight
+through to the paid fallback, because a rate limit is a "not yet", not a "no", and paying
+Claude for one is a free stack quietly becoming a billed one.
 
 `normalise` is not a stage. Mapping a job board's JSON onto our `Find` record is
 find-and-copy work, so it becomes plain Python when the adapters land.
@@ -126,18 +134,68 @@ unsupervised.
 
 | | Wells Fargo, treasury and product owner | Procurement analytics, his actual field |
 |---|---|---|
-| Coverage | 43%, **0% spread over four runs** | 96%, 5 of 5 must-haves |
+| Coverage | 43%, **0% spread over four runs** on a fixed extraction | 96%, 5 of 5 must-haves |
 | Genuine gaps | 6 | 0 |
 | Unsupported claims caught | 3, every run | 0 |
 | Verdict | refused, flagged as a stretch | passes on verified content alone |
 
-The variance is gone. What replaced it is a number that means something: 43% is the honest
-read on a job asking for product ownership, agile delivery and balance sheet risk, none of
-which appear anywhere in the record. The app now says so instead of manufacturing a pass.
-
 **`bakeoff.py` was itself measuring the wrong thing** and now measures coverage over blocks
 that would actually render, rather than over everything the model wrote. An unaccepted
 reaching block never reaches the page, so counting its keywords scored an intention.
+
+## The denominator was moving too
+
+Fixing tailoring exposed the stage above it. `extract` classified must and nice itself,
+and produced **eighteen must-have requirements on one run of the Wells Fargo posting and
+three on the next**. The ATS gate scores coverage against that set, so the denominator was
+changing between runs and a resume passed or failed on which reading the model took.
+
+`keywords.split_by_emphasis()` takes that decision away from the model. The posting does
+not move: a term in the required half is a must, a term appearing only under "preferred"
+is a nice-to-have, and repetition is how much the job leans on it. All three are readable
+from the text.
+
+| | Before | After |
+|---|---|---|
+| Must-have keyword count, four runs | 3 to 18 | **12 every time** |
+| Honest coverage spread | 45 to 57 points | **17 to 25 points** |
+
+**Honest about what is left.** The model still names the *candidate* terms, and it names a
+slightly different set each run, so which twelve survive the cap still shifts. A
+frequency-only candidate list was tried and deleted: word counts cannot tell that UNSPSC
+is a taxonomy and "such" is not, and the top terms came back "ai", "data", "business",
+"lead", "act", "teams", "wells".
+
+This matters less than the number suggests. A package stores its extraction, so **within
+one job the score is fixed**. The residual spread only appears if the same posting is
+analysed twice from scratch, which is not the workflow.
+
+One subtle fix worth remembering: ties in the emphasis ranking used to break on the
+candidate list's order, which let the model back in through the side door. It returns its
+keywords in a different order each run, so equally-emphasised terms swapped places and a
+different twelve survived. Ties now break alphabetically.
+
+## Gap closer, and the direction the override runs in
+
+The truth gate stops a model inventing experience. It had also started stopping Sameer
+recording true things about his own career: "risk" appears in none of his 63 facts, on the
+record of somebody who ran multi-banking treasury operations for three and a half years.
+
+`modules/gaps.py` runs the override one way only. It never lets a keyword onto the page
+unevidenced. It asks a question, and what he types becomes the evidence.
+
+- **Closeability is arithmetic, not a model's opinion.** A model asked "could he plausibly
+  claim this?" says yes to almost anything. Adjacency to the existing record is counted:
+  `likely` if several facts touch the term, `maybe` if one does, `unlikely` if none do
+- **`unlikely` gets no question and no draft.** "Product owner" against a record with no
+  product work is not a gap to close, it is a job that does not fit
+- **Answers are written to `data/profile_facts.json`**, not only to SQLite, because
+  `seed_profile.py` wipes and reloads that table. A fact living only in the database would
+  survive until the next re-seed and then vanish, which is the trap contact details fell
+  into
+- Every fact created this way is stamped `"source": "gap closer"` and marked verified,
+  because he typed it. That flag records who vouched for a fact, and he may vouch for his
+  own career
 
 ## What is proven
 
@@ -146,11 +204,12 @@ tests/test_ats.py        29      the ATS gate against real rejection modes
 tests/test_contact.py    23      contact details, and surviving a re-seed
 tests/test_fetch_jd.py   30      refusing login walls and bot checks
 tests/test_guards.py     34      citations, numbers, tenure, headcount, the render gate
-tests/test_keywords.py   62      placement, the head-noun test, unsupported claims
+tests/test_gaps.py       28      adjacency, refusing to ask, writing back to the JSON
+tests/test_keywords.py   77      placement, the head-noun test, emphasis, unsupported claims
 tests/test_tracker.py    28      counting, the high-water mark, silence
-tests/test_webapp.py     40      every screen, and that a screen cannot skip a gate
+tests/test_webapp.py     46      every screen, and that a screen cannot skip a gate
                         ---
-                        246 passing
+                        295 passing
 ```
 
 The webapp suite's most important case: accept a reaching block, build, untick it, and
@@ -231,6 +290,7 @@ Full rationale in `DECISIONS.md`. The ones most likely to be re-litigated:
 | Date | What happened |
 |---|---|
 | 25 Aug 2026 | Backbone built. `extract` and `tailor` written, 20 guard tests passing. Model routing researched and corrected against the live catalogue. Moved into the project root. Paused |
+| 26 Aug 2026 (night) | Gap closer built: asks about work the record does not cover, writes his answers back to the JSON. `extract` stopped deciding its own denominator. minimax-m3 dropped from every route, rate limited to 0 of 4. Tests 246 to 295 |
 | 26 Aug 2026 (evening) | Deterministic keyword placement. Spread went from 44% to 0%, and the fix uncovered that high coverage had been measuring fabrication. New guard for skill claims no fact supports. Tests 184 to 246 |
 | 26 Aug 2026 (later) | App shell: two modules, dashboard, tracker, modal errors, light and dark. `fetch_jd` done. Bake-off run, which found the variance is prompt-side not model-side. Tests 63 to 184 |
 | 26 Aug 2026 | First live run, Wells Fargo Lead Treasury Analyst JD. `scripts/run_job.py` added to drive the whole pipeline from one command. Two defects found and fixed: non-ASCII punctuation reaching the page, and tenure claims going unchecked. Tests 41 to 63 |

@@ -405,3 +405,106 @@ def sanitise(candidates: Sequence[str], limit: int = MAX_MUST_KEYWORDS) -> List[
         if len(kept) >= limit:
             break
     return kept
+
+
+# ------------------------------------------------- deriving must-haves from the text
+
+# Headings a job description uses to separate what it insists on from what it would like.
+# Matched against a whole line, because "required" appears inside prose constantly and
+# only means something structural when it is a heading.
+_REQUIRED_HEADS = re.compile(
+    r"^\s*(?:required|requirements|minimum|basic|essential|must[\s-]?have|"
+    r"qualifications|what you (?:will )?need|who you are|about you|responsibilities|"
+    r"in this role|job expectations|key accountabilities|the role)\b",
+    re.I | re.M,
+)
+_OPTIONAL_HEADS = re.compile(
+    r"^\s*(?:nice[\s-]?to[\s-]?have|preferred|desired|desirable|bonus|advantageous|"
+    r"good to have|pluses?|it would be great|additionally)\b",
+    re.I | re.M,
+)
+
+
+def _sections(jd_text: str) -> Tuple[str, str]:
+    """Split a job description into what it requires and what it would prefer.
+
+    Crude on purpose: find the headings, cut at them, and treat everything before the
+    first optional heading as required. A job description is not structured data and
+    trying to parse it properly is how you end up with something that works on four
+    postings and silently mangles the fifth.
+    """
+    text = jd_text or ""
+    optional_starts = [m.start() for m in _OPTIONAL_HEADS.finditer(text)]
+    if not optional_starts:
+        return text, ""
+
+    required_parts, optional_parts = [], []
+    cursor = 0
+    for start in optional_starts:
+        required_parts.append(text[cursor:start])
+        # an optional block runs until the next required heading, or the next optional one
+        following = _REQUIRED_HEADS.search(text, start + 1)
+        end = following.start() if following else len(text)
+        for other in optional_starts:
+            if start < other < end:
+                end = other
+        optional_parts.append(text[start:end])
+        cursor = end
+    required_parts.append(text[cursor:])
+    return "\n".join(required_parts), "\n".join(optional_parts)
+
+
+def _mentions(term: str, text: str) -> int:
+    wanted = significant(term)
+    if not wanted:
+        return 0
+    body = " ".join(tokens(text))
+    needle = " ".join(wanted)
+    return body.count(needle)
+
+
+def split_by_emphasis(jd_text: str, candidates: Sequence[str],
+                      limit: int = MAX_MUST_KEYWORDS) -> Tuple[List[str], List[str]]:
+    """Decide must and nice from where a term sits in the posting, not from a model.
+
+    `extract` classifies requirements itself, and it is not steady about it: the same
+    Wells Fargo posting produced eighteen must-have requirements on one run and three on
+    the next. Since the ATS gate scores coverage against that set, its denominator was
+    moving between runs and a resume passed or failed on which reading the model happened
+    to take.
+
+    The posting does not move. A term in the required half is a must, a term that appears
+    only under "preferred" is a nice-to-have, and how often it is repeated is how much
+    the job is leaning on it. All three are readable from the text.
+    """
+    required, optional = _sections(jd_text)
+    clean = sanitise(candidates, limit=200)
+
+    scored = []
+    for term in clean:
+        in_required = _mentions(term, required)
+        in_optional = _mentions(term, optional)
+        if not in_required and not in_optional:
+            continue
+        scored.append((term, in_required, in_optional))
+
+    # Required mentions first, then total weight. A term the posting repeats is one it
+    # cares about, and a filter built from that posting will care about it too.
+    #
+    # Ties break alphabetically, NOT on the candidate list's order. Ordering by input
+    # position let the model back in through the side door: it returns its keywords in a
+    # different order each run, so equally-emphasised terms swapped places and a
+    # different twelve survived the cap. The posting is the only thing allowed to decide.
+    scored.sort(key=lambda row: (-row[1], -(row[1] + row[2]), row[0]))
+
+    must = [term for term, req, _ in scored if req][:limit]
+    nice = [term for term, req, opt in scored if not req and opt]
+    return must, nice
+
+
+# A frequency-only candidate list was tried here and deleted. Counting phrases in the
+# posting is perfectly deterministic and perfectly useless: the top terms came back "ai",
+# "data", "business", "lead", "act", "such", "teams", "wells". Word counts cannot tell
+# that UNSPSC is a taxonomy and "such" is not. The model's domain sense is doing real
+# work in naming candidates; what it could not be trusted with was deciding which of them
+# the job insists on, and split_by_emphasis takes that job away from it.

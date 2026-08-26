@@ -23,7 +23,7 @@ from sqlalchemy.orm import Session
 from config import config
 from database.db import get_db
 from database.models import GeneratedBlock, Package, ProfileFact
-from modules import tracker
+from modules import gaps, tracker
 from modules import contact as contact_module
 from modules.ats import AtsBlocked, check as ats_check
 from modules.extract import Extraction, NotAJobDescription, extract
@@ -243,6 +243,7 @@ def _package_view(request: Request, db: Session, package: Package,
     return render(request, "review.html", section="writer", _db=db,
                   placement=package.placement or {},
                   fact_count=len(fact_rows),
+                  orgs=gaps.roles(fact_rows),
                   package=package, extraction=extraction,
                   must=extraction.must, nice=extraction.nice,
                   blocks=shown, rejected=rejected, facts=facts,
@@ -347,7 +348,7 @@ def _build(request: Request, db: Session, package: Package):
     report = ats_check(
         path,
         must_keywords=extraction.must_keywords(),
-        nice_keywords=[r.keyword for r in extraction.nice if r.keyword],
+        nice_keywords=extraction.nice_keywords(),
         expect_roles=len(payload.experience),
         expect_phone=True,
     )
@@ -387,6 +388,54 @@ def download(package_id: int, db: Session = Depends(get_db)):
     name = f"{(package.company or 'resume').replace(' ', '-')}-Sameer-Iyer.docx"
     return FileResponse(path, filename=name, media_type=(
         "application/vnd.openxmlformats-officedocument.wordprocessingml.document"))
+
+
+# ---------------------------------------------------------------------- gap closer
+
+@router.post("/job/writer/{package_id}/gaps")
+def gaps_ask(request: Request, package_id: int, db: Session = Depends(get_db)):
+    """Ask him about the gaps the record is anywhere near. Costs a few model calls."""
+    package = db.get(Package, package_id)
+    if package is None:
+        return RedirectResponse("/job/writer", status_code=303)
+
+    report = package.placement or {}
+    wanted = list(report.get("gaps") or []) + list(report.get("unsupported") or [])
+    if not wanted:
+        return _package_view(request, db, package,
+                             message="No gaps to close on this one.")
+
+    facts = [f for f in db.query(ProfileFact).order_by(ProfileFact.order_index).all()
+             if f.verified]
+    try:
+        suggestions = gaps.suggest(wanted, facts, role=package.title or "")
+    except Exception as exc:  # noqa: BLE001 - a failed suggestion must not lose the package
+        log.warning("gap closer failed: %s", exc)
+        return _package_view(request, db, package,
+                             error=f"Could not draft the questions: {exc}",
+                             error_title="The gap closer failed")
+
+    package.placement = {**report, "suggestions": [s.as_dict() for s in suggestions]}
+    db.commit()
+    return RedirectResponse(f"/job/writer/{package_id}#gaps", status_code=303)
+
+
+@router.post("/job/writer/{package_id}/gaps/save")
+def gaps_save(request: Request, package_id: int, db: Session = Depends(get_db),
+              text: str = Form(""), org: str = Form(""), keyword: str = Form("")):
+    """Turn what he typed into a fact. His words, his attestation, his record."""
+    package = db.get(Package, package_id)
+    if package is None:
+        return RedirectResponse("/job/writer", status_code=303)
+    try:
+        gaps.save_answer(db, text, org=org or None, keyword=keyword or None)
+    except (ValueError, OSError, KeyError) as exc:
+        return _package_view(request, db, package, error=str(exc),
+                             error_title="Could not save that")
+    return _package_view(
+        request, db, package,
+        message=("Saved to your record. Rebuild the resume and it can be cited now. "
+                 "It is in data/profile_facts.json too, so a re-seed keeps it."))
 
 
 # -------------------------------------------------------------------------- details

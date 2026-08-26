@@ -84,8 +84,8 @@
   {% if placement.gaps %}
   <h3 style="margin-top: 16px;">Genuine gaps</h3>
   <p class="hint" style="margin-top: 0;">
-    No fact supports these, so they stay off the page. This is the honest read on the job,
-    not a bug. If you have done one of them, add it to your facts and run this again.
+    No fact supports these, so they stay off the page. If you have actually done one of
+    them and it is simply not written down, close the gap and it becomes citable.
   </p>
   <div class="pill-row">
     {% for term in placement.gaps %}<span class="pill miss">{{ term }}</span>{% endfor %}
@@ -99,6 +99,71 @@
   </div>
   {% endif %}
 </div>
+{% endif %}
+
+<!-- ------------------------------------------------------------------ gap closer -->
+<h2 id="gaps">Close the gaps</h2>
+{% if not placement.suggestions %}
+<div class="panel">
+  <p style="margin-top: 0; font-size: 14px;">
+    Some of what this job wants may be work you have done and never written down. This
+    reads the closest things already in your record and asks you about them, one question
+    at a time. It will not put words in your mouth: you answer, and your answer becomes
+    the fact.
+  </p>
+  <form method="post" action="/job/writer/{{ package.id }}/gaps">
+    <div class="actions" style="margin-top: 0;">
+      <button type="submit">Ask me about the gaps</button>
+      <span class="hint">A few model calls, about twenty seconds, on the free tier.</span>
+    </div>
+  </form>
+</div>
+{% else %}
+{% for s in placement.suggestions %}
+  <div class="panel">
+    <div class="block-head" style="margin-bottom: 10px;">
+      <span class="badge {{ 'inferred' if s.closeability == 'likely' else ('section' if s.closeability == 'maybe' else 'blocked') }}">{{ s.closeability }}</span>
+      <strong style="color: var(--ink); font-size: 15px;">{{ s.keyword }}</strong>
+    </div>
+
+    {% if not s.worth_asking %}
+      <p style="font-size: 14px; margin: 0; color: var(--muted);">{{ s.honest_read }}</p>
+    {% else %}
+      <p style="font-size: 15px; color: var(--ink); margin: 0 0 6px;">{{ s.question }}</p>
+      {% if s.why %}<p class="hint" style="margin: 0 0 10px;">Why they care: {{ s.why }}</p>{% endif %}
+
+      {% if s.nearby %}
+      <div class="block-meta" style="border-top: 1px solid var(--line); padding-top: 8px; margin-bottom: 10px;">
+        <strong>Closest things already on file</strong>
+        {% for n in s.nearby %}<div style="margin-top: 3px;">#{{ n.id }} {{ n.text }}</div>{% endfor %}
+      </div>
+      {% endif %}
+
+      <form method="post" action="/job/writer/{{ package.id }}/gaps/save">
+        <input type="hidden" name="keyword" value="{{ s.keyword }}">
+        <label for="ans-{{ loop.index }}">Your answer, in your words</label>
+        <textarea id="ans-{{ loop.index }}" name="text" style="min-height: 90px;"
+                  placeholder="{{ s.draft or 'Say what you actually did.' }}"></textarea>
+        <p class="hint">
+          The grey text is a shape, not a suggestion. Replace it entirely. Anything you
+          type here is saved as a fact you have vouched for, and the writer can cite it.
+        </p>
+        <div style="display: flex; gap: 8px; align-items: center; margin-top: 8px; flex-wrap: wrap;">
+          <select name="org">
+            <option value="">Not tied to one employer</option>
+            {% for org in orgs %}<option value="{{ org }}">{{ org }}</option>{% endfor %}
+          </select>
+          <button type="submit">Save as a fact</button>
+        </div>
+      </form>
+      {% if s.honest_read %}
+      <p class="hint" style="margin-top: 10px; border-top: 1px solid var(--line); padding-top: 8px;">
+        Honest read: {{ s.honest_read }}
+      </p>
+      {% endif %}
+    {% endif %}
+  </div>
+{% endfor %}
 {% endif %}
 
 <!-- ------------------------------------------------------------------- blocks -->

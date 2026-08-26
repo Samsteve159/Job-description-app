@@ -46,6 +46,7 @@ STAGES = (
     "cover",       # cover letter
     "screening",   # screening answer bank
     "brief",       # interview brief (Section 3, standalone)
+    "gaps",        # asks him about work the record does not cover
 )
 
 # "normalise" is deliberately NOT a stage. Mapping one job board's JSON fields onto our own
@@ -58,7 +59,13 @@ STAGES = (
 # through a silent fallback weeks later.
 # Chosen from scripts/probe_models.py against the live key, not from a published list.
 # The first set of ids came from a blog and every one of them was dead. See ERROR_LOG.md.
-NIM_FAST = "minimaxai/minimax-m3"                  # 2.6s extract, 3.8s tailor, seniority right
+# minimaxai/minimax-m3 was NIM_FAST and was the right pick on the probe: 2.6s extract,
+# seniority correct, all must-haves found. It is now rate limited to the point of being
+# unavailable, 0 of 4 calls answered with 429 while both gpt-oss models answered 4 of 4 in
+# about a second. Availability beats benchmark scores: a model that will not answer is not
+# fast. Left here as a comment rather than deleted, because free-tier throttling moves and
+# it may be worth re-probing later.
+NIM_FAST = "openai/gpt-oss-20b"                    # 1.0s, answered every call
 NIM_MAIN = "openai/gpt-oss-120b"                   # 3.2s tailor, fastest on the hard task
 NIM_BIG = "nvidia/nemotron-3-super-120b-a12b"      # slower but a large MoE, bake-off candidate
 PAID_PROVIDERS = ("anthropic",)
@@ -66,11 +73,15 @@ DEFAULT_CLAUDE_MODEL = "claude-sonnet-5"
 
 STAGE_DEFAULTS = {
     "score": NIM_FAST,        # highest volume, fastest usable model
-    "extract": NIM_FAST,      # 5/5 must-haves, 15 keywords, seniority correct
+    "extract": NIM_MAIN,      # sets the keywords every later stage is measured against
     "tailor": NIM_MAIN,       # fastest model that held the citation shape on the hard task
     "cover": NIM_MAIN,        # prose is untested by the probe. Bake-off before trusting it
     "screening": NIM_FAST,
     "brief": NIM_FAST,
+    # Writes a question rather than a claim, which sounded like the easy half of the job.
+    # It is not: the output is structured JSON with a judgement call in it, and gpt-oss-20b
+    # returned an empty response often enough to fall through to the paid fallback.
+    "gaps": NIM_MAIN,
 }
 
 # Thinking models run an internal chain of thought before answering. Sampling above roughly

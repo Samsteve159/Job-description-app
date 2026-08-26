@@ -170,7 +170,7 @@ def main() -> int:
         report = check(
             path,
             must_keywords=ex.must_keywords(),
-            nice_keywords=[r.keyword for r in ex.nice if r.keyword],
+            nice_keywords=ex.nice_keywords(),
             # roles that actually reached the page, not every role on file. A role
             # whose bullets were all dropped is not missing a date, it is not there
             expect_roles=len(payload.experience),
