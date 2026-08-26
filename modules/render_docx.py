@@ -18,6 +18,7 @@ accepted, cannot reach the page even if a caller asks for it.
 """
 from __future__ import annotations
 
+import unicodedata
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, List, Optional
@@ -41,6 +42,41 @@ SECTION_HEADINGS = {
     "education": "EDUCATION",
     "certifications": "CERTIFICATIONS",
 }
+
+
+# Characters a model reaches for that an ATS parser has no reason to handle well. The
+# em dash is the famous one, but the first live run leaked U+2011 NON-BREAKING HYPHEN
+# into four blocks, and audit() only screened for em and en dashes, so it passed clean.
+# Anything non-ASCII in a resume is a liability: parsers built in the 2000s mangle it,
+# and a keyword filter comparing "AI\u2011agent" to "ai agent" scores zero.
+PUNCTUATION_MAP = {
+    "\u2014": ", ",   # em dash
+    "\u2013": "-",    # en dash
+    "\u2012": "-",    # figure dash
+    "\u2011": "-",    # non-breaking hyphen
+    "\u2010": "-",    # hyphen
+    "\u2018": "'",    # curly quotes
+    "\u2019": "'",
+    "\u201c": '"',
+    "\u201d": '"',
+    "\u2026": "...",  # ellipsis
+    "\u00a0": " ",    # non-breaking space
+    "\u200b": "",     # zero width space
+    "\u2022": "",     # bullet glyph. The list style supplies the bullet
+    "\u2192": " to ", # arrow
+    "\u00ad": "",     # soft hyphen
+}
+
+
+def plain_text(text: str) -> str:
+    """Force text down to characters a parser from 2004 would survive.
+
+    Applied at write time rather than trusted to the prompt. The house style tells the
+    model not to do this; this makes it true regardless of whether it listened.
+    """
+    for bad, good in PUNCTUATION_MAP.items():
+        text = text.replace(bad, good)
+    return " ".join(text.split())
 
 
 class BlockedContentError(RuntimeError):
@@ -126,7 +162,7 @@ def _line(doc: Document, text: str, bold: bool = False, muted: bool = False,
     p = doc.add_paragraph()
     if space_before:
         p.paragraph_format.space_before = Pt(space_before)
-    run = p.add_run(text)
+    run = p.add_run(plain_text(text))
     run.bold = bold
     run.font.name = BODY_FONT
     run.font.size = size or BODY_SIZE
@@ -136,7 +172,7 @@ def _line(doc: Document, text: str, bold: bool = False, muted: bool = False,
 def _bullet(doc: Document, text: str) -> None:
     p = doc.add_paragraph(style="List Bullet")
     p.paragraph_format.space_after = Pt(3)
-    run = p.add_run(text)
+    run = p.add_run(plain_text(text))
     run.font.name = BODY_FONT
     run.font.size = BODY_SIZE
     run.font.color.rgb = INK
@@ -153,7 +189,7 @@ def render_resume(payload: ResumePayload, out_path: Path) -> Path:
     # name, as ordinary body text rather than a Heading style so parsers read it plainly
     p = doc.add_paragraph()
     p.alignment = WD_ALIGN_PARAGRAPH.LEFT
-    run = p.add_run(payload.name)
+    run = p.add_run(plain_text(payload.name))
     run.bold = True
     run.font.size = NAME_SIZE
     run.font.name = BODY_FONT
@@ -226,9 +262,15 @@ def audit(path: Path) -> Dict[str, object]:
         problems.append("contains a footer")
     if len(doc.tables) > 0:
         problems.append(f"{len(doc.tables)} table(s) via python-docx")
-    for dash in ("—", "–"):
-        if dash in text:
-            problems.append(f"contains {'em' if dash == chr(8212) else 'en'} dash")
+    for bad in PUNCTUATION_MAP:
+        if bad in text:
+            problems.append(f"contains U+{ord(bad):04X} {unicodedata.name(bad, '?')}")
+    stray = sorted({c for c in text if ord(c) > 127} - set(PUNCTUATION_MAP))
+    if stray:
+        problems.append(
+            "contains non-ASCII characters a parser may mangle: "
+            + ", ".join(f"U+{ord(c):04X}" for c in stray[:8])
+        )
 
     headings = [h for h in SECTION_HEADINGS.values() if h in text]
 

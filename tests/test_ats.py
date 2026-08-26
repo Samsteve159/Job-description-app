@@ -86,6 +86,27 @@ ok("all must-haves found", r.must_coverage == 1.0, r.must)
 ok("missing nice-to-have warns but does not block",
    any("nice-to-have" in w for w in r.warnings) and r.passed, r.warnings)
 
+print("\ncharacter hygiene")
+# The first live run leaked U+2011 NON-BREAKING HYPHEN into four blocks and audit()
+# passed the file clean, because it only screened for em and en dashes.
+from modules.render_docx import audit, plain_text  # noqa: E402
+
+ok("em dash becomes a comma", plain_text("cost\u2014recovery") == "cost, recovery",
+   plain_text("cost\u2014recovery"))
+ok("non-breaking hyphen becomes a hyphen", plain_text("AI\u2011agent") == "AI-agent",
+   plain_text("AI\u2011agent"))
+ok("curly apostrophe flattened", plain_text("client\u2019s") == "client's")
+ok("non-breaking space flattened", plain_text("a\u00a0b") == "a b")
+ok("ellipsis expanded", plain_text("wait\u2026") == "wait...")
+ok("plain ASCII is left alone", plain_text("Spend analysis, SQL.") == "Spend analysis, SQL.")
+
+f = build(summary="Ran AI\u2011agent spend analysis \u2014 in SQL against UNSPSC\u2026")
+rendered = str(audit(f)["text"])
+ok("dirty characters do not reach the page",
+   all(ord(c) < 128 for c in rendered),
+   [f"U+{ord(c):04X}" for c in rendered if ord(c) > 127])
+ok("a normalised file still passes the audit", audit(f)["ok"], audit(f)["problems"])
+
 print("\ngate")
 try:
     gate(check(build(contact=["Mumbai"]), MUST, expect_roles=1))

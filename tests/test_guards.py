@@ -14,7 +14,8 @@ from types import SimpleNamespace
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from modules.tailor import Block, TailorResult, _validate, to_payload  # noqa: E402
+from modules.tailor import (Block, TailorResult, _tenure_claims,  # noqa: E402
+                            _validate, experience_years, to_payload)
 from modules.render_docx import gate, BlockedContentError               # noqa: E402
 
 
@@ -81,6 +82,59 @@ for claim in ["Led a team of four analysts.", "Managed a team across two regions
 
 b, reason = _validate(Block("experience", "Owned the analysis end to end.", [20], "verified"), KNOWN)
 check("ownership language allowed", reason is None, reason)
+
+print("\ntenure")
+# The first live run against a real job description understated nine years of history
+# as "6+ years", against a posting asking for 5+. Every existing guard passed it:
+# _NUMBER matches currency and percentages, so a bare year count was invisible.
+from datetime import date  # noqa: E402
+
+roles = [
+    SimpleNamespace(kind="role", date_from="Mar 2015", date_to="Mar 2018"),
+    SimpleNamespace(kind="role", date_from="Apr 2018", date_to="Oct 2021"),
+    SimpleNamespace(kind="role", date_from="Dec 2023", date_to="Present"),
+]
+years = experience_years(roles, today=date(2026, 8, 26))
+check("years summed across roles, study gap excluded", years == 9.2, years)
+check("an end-to-end span would have overstated it", years < 11.5, years)
+
+overlap = [
+    SimpleNamespace(kind="role", date_from="Jan 2020", date_to="Jan 2024"),
+    SimpleNamespace(kind="role", date_from="Jan 2022", date_to="Jan 2023"),
+]
+check("overlapping roles are not double counted",
+      experience_years(overlap, today=date(2026, 8, 26)) == 4.0,
+      experience_years(overlap, today=date(2026, 8, 26)))
+check("no roles gives no figure rather than zero", experience_years([]) is None)
+
+for text, want in [
+    ("with 6+ years delivering corporate treasury", [6.0]),
+    ("nine years of banking and treasury experience", [9.0]),
+    ("10 years' experience in FP&A", [10.0]),
+    ("5 years ago", []),
+    ("a 3 year programme", []),
+    ("a ~$120M five-year value case", []),
+]:
+    check(f"tenure read from {text[:34]!r}", _tenure_claims(text) == want, _tenure_claims(text))
+
+b, reason = _validate(
+    Block("summary", "Treasury professional with 6+ years of experience.", [20], "inferred"),
+    KNOWN, actual_years=9.8)
+check("understated tenure is blocked", reason is not None and b.grade == "blocked", reason)
+
+b, reason = _validate(
+    Block("summary", "Treasury professional with 15 years of experience.", [20], "inferred"),
+    KNOWN, actual_years=9.8)
+check("overstated tenure is blocked", reason is not None and b.grade == "blocked", reason)
+
+b, reason = _validate(
+    Block("summary", "Treasury professional with 10 years of experience.", [20], "inferred"),
+    KNOWN, actual_years=9.8)
+check("a tenure claim within tolerance passes", reason is None, reason)
+
+b, reason = _validate(
+    Block("experience", "Built treasury dashboards.", [20], "verified"), KNOWN, actual_years=None)
+check("no computed figure means no tenure check", reason is None, reason)
 
 print("\nrender gate")
 for label, block in [

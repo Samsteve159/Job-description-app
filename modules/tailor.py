@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import logging
 import re
+from datetime import date
 from dataclasses import dataclass, field
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 
@@ -168,9 +169,99 @@ def _numbers(text: str) -> List[str]:
     return [re.sub(r"[\s,]", "", m.group(0)).lower() for m in _NUMBER.finditer(text or "")]
 
 
+# A tenure claim is the first thing a recruiter filters on, and _NUMBER does not see it:
+# it matches currency and percentages, so "6+ years" and "nine years" both pass unchecked.
+# The first live run understated nine years as "6+ years" against a job asking for 5+.
+# Wrong in the direction that costs an interview, and invisible to every existing guard.
+_WORD_NUMBERS = {
+    "one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6, "seven": 7,
+    "eight": 8, "nine": 9, "ten": 10, "eleven": 11, "twelve": 12, "thirteen": 13,
+    "fourteen": 14, "fifteen": 15, "sixteen": 16, "seventeen": 17, "eighteen": 18,
+    "nineteen": 19, "twenty": 20,
+}
+# Deliberately narrow. It must read as a claim about how long he has worked, so a
+# "3 year programme" or a "five-year value case" is left alone. A false positive here
+# blocks a summary, which is expensive, so the phrase has to earn the match.
+_TENURE_CONTEXT = (
+    r"(?:\s*(?:'|\u2019)?s?\s*"
+    r"(?:of\s+"
+    r"|(?:professional\s+|hands.on\s+|combined\s+)?"
+    r"(?:experience|expertise|background|career|delivering|working|spanning|across|in)\b))"
+)
+_TENURE = re.compile(
+    r"\b(\d{1,2}|" + "|".join(_WORD_NUMBERS) + r")\s*\+?\s*(?:years?|yrs?)\b"
+    r"(?=" + _TENURE_CONTEXT + r")"
+    r"(?![^.]{0,24}\b(?:ago|old)\b)",
+    re.I,
+)
+
+_MONTHS = ("jan", "feb", "mar", "apr", "may", "jun",
+           "jul", "aug", "sep", "oct", "nov", "dec")
+
+# how far a claim may sit from the computed figure before it is treated as wrong
+TENURE_TOLERANCE_YEARS = 1.0
+
+
+def _as_months(value: Optional[str], today_months: int) -> Optional[int]:
+    """'Apr 2018' or 'Present' to a month count. None when unparseable."""
+    if not value:
+        return None
+    text = value.strip().lower()
+    if text in ("present", "current", "now", "ongoing"):
+        return today_months
+    match = re.search(r"([a-z]{3})[a-z]*\.?\s*(\d{4})", text)
+    if match and match.group(1) in _MONTHS:
+        return int(match.group(2)) * 12 + _MONTHS.index(match.group(1))
+    match = re.search(r"\b(\d{4})\b", text)
+    return int(match.group(1)) * 12 if match else None
+
+
+def experience_years(facts: Sequence[Any], today: Optional[date] = None) -> Optional[float]:
+    """Years actually worked, summed across roles, merging any overlap.
+
+    Summed rather than measured end to end, because a study gap is not experience and
+    claiming it as such is the kind of thing a background check turns up.
+    """
+    today = today or date.today()
+    now_months = today.year * 12 + (today.month - 1)
+
+    spans = []
+    for fact in facts:
+        if getattr(fact, "kind", None) != "role":
+            continue
+        start = _as_months(getattr(fact, "date_from", None), now_months)
+        end = _as_months(getattr(fact, "date_to", None), now_months)
+        if start is None:
+            continue
+        spans.append((start, min(end if end is not None else now_months, now_months)))
+
+    if not spans:
+        return None
+
+    total, cursor = 0, None
+    for start, end in sorted(spans):
+        if end <= start:
+            continue
+        if cursor is not None and start < cursor:
+            start = cursor          # overlapping roles are not counted twice
+        if end > start:
+            total += end - start
+            cursor = end
+    return round(total / 12.0, 1)
+
+
+def _tenure_claims(text: str) -> List[float]:
+    out = []
+    for match in _TENURE.finditer(text or ""):
+        token = match.group(1).lower()
+        out.append(float(_WORD_NUMBERS[token] if token in _WORD_NUMBERS else int(token)))
+    return out
+
+
 # ------------------------------------------------------------------------- validation
 
-def _validate(block: Block, known: Dict[int, Any]) -> Tuple[Block, Optional[str]]:
+def _validate(block: Block, known: Dict[int, Any],
+              actual_years: Optional[float] = None) -> Tuple[Block, Optional[str]]:
     """Apply the three hard checks. Returns the block and a rejection reason, or None."""
     # 1. citations must exist
     real = [i for i in block.fact_ids if i in known]
@@ -195,6 +286,24 @@ def _validate(block: Block, known: Dict[int, Any]) -> Tuple[Block, Optional[str]
         for i in real
     )
     allowed = set(_numbers(cited_text))
+
+    # 2a. Tenure is checked against the role dates rather than the cited text, because a
+    # summary citing a role fact can still get the years wrong in either direction. It
+    # runs before the drift check and exempts its own digits on success: with 9.8 years
+    # on the clock "10 years" is the honest phrasing, and _NUMBER would otherwise read
+    # that 10 as an invented figure and block a true statement.
+    if actual_years is not None:
+        for claimed in _tenure_claims(block.text):
+            if abs(claimed - actual_years) > TENURE_TOLERANCE_YEARS:
+                block.grade = "blocked"
+                log.warning(
+                    "TENURE DRIFT: claimed %.0f years, roles total %.1f. Text: %r",
+                    claimed, actual_years, block.text[:90],
+                )
+                return block, (f"claims {claimed:.0f} years of experience, "
+                               f"the role dates total {actual_years:.1f}")
+            allowed.add(str(int(claimed)))
+
     drifted = [n for n in _numbers(block.text) if n not in allowed]
     if drifted:
         block.grade = "blocked"
@@ -247,6 +356,10 @@ def tailor(extraction: Any, facts: Sequence[Any]) -> TailorResult:
     if len(citable) < len(facts):
         log.info("%d unverified fact(s) withheld from tailoring", len(facts) - len(citable))
 
+    # Computed, not estimated. Left to itself the model guesses from the role list and
+    # gets it wrong, which is how a nine year record went out claiming "6+ years".
+    actual_years = experience_years(facts)
+
     must = "\n".join(
         f"- ({r.weight:.1f}) {r.text}" + (f"  [keyword: {r.keyword}]" if r.keyword else "")
         for r in extraction.must
@@ -258,6 +371,11 @@ def tailor(extraction: Any, facts: Sequence[Any]) -> TailorResult:
         f"COMPANY: {extraction.company or 'unspecified'}\n"
         f"SENIORITY: {extraction.seniority}\nEMPLOYER TYPE: {extraction.archetype}\n\n"
         f"MUST HAVE:\n{must}\n\nNICE TO HAVE:\n{nice}\n\n"
+        + (f"YEARS OF EXPERIENCE: {actual_years:.0f}. This figure is computed from the\n"
+           f"role dates. If you state years of experience, state this number. Do not\n"
+           f"estimate your own and do not round it down.\n\n"
+           if actual_years is not None else "")
+        +
         f"MUST-HAVE KEYWORDS. Use these exact strings wherever a fact supports it. A\n"
         f"synonym does not match and scores zero:\n"
         f"  {', '.join(extraction.must_keywords()) or 'none stated'}\n\n"
@@ -294,7 +412,7 @@ def tailor(extraction: Any, facts: Sequence[Any]) -> TailorResult:
 
     result = TailorResult()
     for block in candidates:
-        checked, reason = _validate(block, known)
+        checked, reason = _validate(block, known, actual_years)
         (result.rejected.append((checked, reason)) if reason
          else result.blocks.append(checked))
 
