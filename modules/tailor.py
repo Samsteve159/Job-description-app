@@ -384,7 +384,12 @@ def tailor(extraction: Any, facts: Sequence[Any]) -> TailorResult:
         f"FACTS (cite these by the id in square brackets):\n{_facts_block(citable)}"
     )
 
-    data = complete_json("tailor", system=_SYSTEM, user=user, max_tokens=6000, temperature=0.3)
+    # 6000 truncated Claude's output mid-JSON on two runs in three during the bake-off,
+    # which surfaces as "did not return parseable JSON" and looks like a model that
+    # cannot follow a schema. It was a budget, not a capability. Claude writes more
+    # blocks than the NIM models for the same input, so the ceiling has to fit the most
+    # verbose model on the list, not the one currently routed.
+    data = complete_json("tailor", system=_SYSTEM, user=user, max_tokens=12000, temperature=0.3)
     if not isinstance(data, dict):
         raise RuntimeError(f"tailor returned {type(data).__name__}, expected an object")
 

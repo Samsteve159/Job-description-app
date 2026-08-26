@@ -66,19 +66,47 @@ def _call_nim(model: str, system: str, user: str, max_tokens: int, temperature: 
         raise LLMError(f"NIM returned an unexpected shape: {exc}") from exc
 
 
+# Models that reject `temperature` outright. Claude Sonnet 5 returns
+# 400 "`temperature` is deprecated for this model" at any value but the default, which
+# took the fallback route down on its first real health check. Learned at runtime rather
+# than hardcoded, for the same reason model ids are probed rather than trusted: the list
+# is a moving target and a stale constant fails closed on a route meant to be the safety
+# net. First call for a model pays one retry, the rest of the process skips the parameter.
+_NO_TEMPERATURE = set()
+
+
+def _rejects_temperature(exc: Exception) -> bool:
+    text = str(exc).lower()
+    return "temperature" in text and (
+        "deprecated" in text or "unsupported" in text or "not supported" in text
+    )
+
+
 def _call_anthropic(model: str, system: str, user: str, max_tokens: int, temperature: float) -> str:
     if not config.anthropic_api_key:
         raise LLMError("ANTHROPIC_API_KEY is not set")
     import anthropic  # imported lazily so a NIM-only run needs no SDK
 
     client = anthropic.Anthropic(api_key=config.anthropic_api_key)
-    msg = client.messages.create(
-        model=model,
-        max_tokens=max_tokens,
-        temperature=temperature,
-        system=system,
-        messages=[{"role": "user", "content": user}],
-    )
+    kwargs = {
+        "model": model,
+        "max_tokens": max_tokens,
+        "system": system,
+        "messages": [{"role": "user", "content": user}],
+    }
+    if model not in _NO_TEMPERATURE:
+        kwargs["temperature"] = temperature
+
+    try:
+        msg = client.messages.create(**kwargs)
+    except Exception as exc:  # noqa: BLE001 - narrowed immediately by _rejects_temperature
+        if "temperature" not in kwargs or not _rejects_temperature(exc):
+            raise
+        log.info("%s rejects temperature, retrying without it and remembering", model)
+        _NO_TEMPERATURE.add(model)
+        kwargs.pop("temperature")
+        msg = client.messages.create(**kwargs)
+
     return "".join(b.text for b in msg.content if getattr(b, "type", "") == "text")
 
 

@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}Job App{% endblock %}</title>
+<link rel="stylesheet" href="/static/app.css">
+<script>
+  // Applied before first paint so a dark-mode user never sees a white flash. Stored
+  // choice wins; with nothing stored the OS setting decides, which is why nothing is
+  // written to the attribute unless a choice was actually made.
+  (function () {
+    try {
+      var saved = localStorage.getItem("theme");
+      if (saved === "dark" || saved === "light") {
+        document.documentElement.setAttribute("data-theme", saved);
+      }
+    } catch (e) { /* private browsing, fall through to the OS setting */ }
+  })();
+</script>
+</head>
+<body>
+<header class="top">
+  <div class="top-inner">
+    <a class="brand" href="/">Sameer's Workbench</a>
+    <div class="modules">
+      <a href="/job" class="{{ 'active' if module == 'job' }}">Job App</a>
+      <a href="/posts" class="{{ 'active' if module == 'posts' }} soon">Post Writer</a>
+    </div>
+    <button class="theme-toggle" type="button" onclick="cycleTheme()" id="themeBtn">Theme</button>
+  </div>
+  {% if module == 'job' %}
+  <div class="subnav">
+    <div class="subnav-inner">
+      <nav class="sections">
+        <a href="/job" class="{{ 'active' if section == 'dashboard' }}">Dashboard</a>
+        <a href="/job/finds" class="{{ 'active' if section == 'finds' }} soon">Scout Finds</a>
+        <a href="/job/writer" class="{{ 'active' if section == 'writer' }}">Resume &amp; Cover</a>
+        <a href="/job/tracker" class="{{ 'active' if section == 'tracker' }}">Tracker{% if live_count %}<span class="count-label">{{ live_count }}</span>{% endif %}</a>
+        <a href="/job/brief" class="{{ 'active' if section == 'brief' }} soon">Interview Brief</a>
+        <a href="/job/details" class="{{ 'active' if section == 'details' }}">My Details</a>
+      </nav>
+    </div>
+  </div>
+  {% endif %}
+</header>
+
+<main>
+{% if message %}<div class="notice ok">{{ message }}</div>{% endif %}
+{% block body %}{% endblock %}
+</main>
+
+{# Errors are modals, not a strip at the top of the page. A page-top notice is easy to
+   scroll past, and an export being refused is not something to discover later. #}
+{% if error %}
+<div class="modal-backdrop" id="errorModal" onclick="if (event.target === this) closeModal()">
+  <div class="modal" role="alertdialog" aria-modal="true" aria-labelledby="modalTitle">
+    <div class="modal-icon {{ error_kind or 'bad' }}">!</div>
+    <h2 id="modalTitle">{{ error_title or 'That did not work' }}</h2>
+    {% if error is string %}
+      <p>{{ error }}</p>
+    {% else %}
+      {% for line in error %}<p>{{ line }}</p>{% endfor %}
+    {% endif %}
+    {% if error_hint %}<p style="color: var(--muted);">{{ error_hint }}</p>{% endif %}
+    <div class="actions">
+      <button type="button" onclick="closeModal()">Got it</button>
+      {% if error_link %}<a class="button secondary" href="{{ error_link }}">{{ error_link_label or 'Fix it' }}</a>{% endif %}
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<script>
+  function closeModal() {
+    var m = document.getElementById("errorModal");
+    if (m) { m.remove(); }
+  }
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape") { closeModal(); }
+  });
+
+  // Three states, cycled in the order a person expects: whatever you are on now, the
+  // other one, then back to following the system.
+  function currentTheme() {
+    return document.documentElement.getAttribute("data-theme") || "system";
+  }
+  function cycleTheme() {
+    var next = { system: "dark", dark: "light", light: "system" }[currentTheme()];
+    if (next === "system") {
+      document.documentElement.removeAttribute("data-theme");
+      try { localStorage.removeItem("theme"); } catch (e) {}
+    } else {
+      document.documentElement.setAttribute("data-theme", next);
+      try { localStorage.setItem("theme", next); } catch (e) {}
+    }
+    paintThemeButton();
+  }
+  function paintThemeButton() {
+    var b = document.getElementById("themeBtn");
+    if (b) { b.textContent = { system: "Auto", dark: "Dark", light: "Light" }[currentTheme()]; }
+  }
+  paintThemeButton();
+</script>
+</body>
+</html>

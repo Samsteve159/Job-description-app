@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% block title %}Job App{% endblock %}
+{% block body %}
+
+<h1>Dashboard</h1>
+<p class="lead">Where the search actually stands, not how busy it has felt.</p>
+
+<div class="cards">
+  <div class="card">
+    <div class="k">Applied</div>
+    <div class="n">{{ stats.total }}</div>
+    <div class="sub">{{ stats.this_week }} in the last 7 days</div>
+  </div>
+  <div class="card accent">
+    <div class="k">Live</div>
+    <div class="n">{{ stats.live }}</div>
+    <div class="sub">{% if stats.stale %}{{ stats.stale }} gone quiet{% else %}all still moving{% endif %}</div>
+  </div>
+  <div class="card">
+    <div class="k">Reached a human</div>
+    <div class="n">{{ stats.reached_human }}</div>
+    <div class="sub">{{ '%.0f' % stats.response_rate }}% of everything sent</div>
+  </div>
+  <div class="card">
+    <div class="k">Resumes built</div>
+    <div class="n">{{ stats.packages_built }}</div>
+    <div class="sub">{{ stats.drafts }} still in draft</div>
+  </div>
+</div>
+
+<div class="split">
+  <div class="panel">
+    <h3>Applications a week</h3>
+    <div class="bars">
+      {% for w in stats.weeks %}
+        <div class="bar {{ 'empty' if not w.count }}">
+          <div class="val">{{ w.count or '' }}</div>
+          <div class="fill" style="height: {{ (w.count / stats.peak_week * 100) if stats.peak_week else 0 }}%"></div>
+        </div>
+      {% endfor %}
+    </div>
+    <div style="display: flex; gap: 6px;">
+      {% for w in stats.weeks %}<div class="lab" style="flex: 1; text-align: center; font-size: 10px; color: var(--muted);">{{ w.label }}</div>{% endfor %}
+    </div>
+  </div>
+
+  <div class="panel">
+    <h3>How far they get</h3>
+    {% for step in stats.funnel %}
+      <div class="funnel-row">
+        <div class="name">{{ step.label }}</div>
+        <div class="track">
+          <div class="fill" style="width: {{ (step.count / stats.total * 100) if stats.total else 0 }}%"></div>
+        </div>
+        <div class="n">{{ step.count }}</div>
+      </div>
+    {% endfor %}
+    {% if not stats.total %}
+      <p class="hint">Nothing logged yet. Add an application from the Tracker, or build a
+      resume and it will offer to log one.</p>
+    {% endif %}
+  </div>
+</div>
+
+{% if not gmail_ready %}
+<div class="panel tight" style="border-left: 3px solid var(--amber);">
+  <strong style="color: var(--ink); font-size: 14px;">Counting is manual for now</strong>
+  <p class="hint" style="margin-top: 4px;">
+    Reading applications out of Gmail needs a Google Cloud project and an OAuth client
+    that only you can create. Until then the Tracker takes entries by hand, and building
+    a resume offers to log one for you.
+  </p>
+</div>
+{% endif %}
+
+{% if packages %}
+<h2>Recent packages</h2>
+<div class="panel tight">
+  <table>
+    <thead><tr><th>Role</th><th>Company</th><th>Status</th><th>Created</th><th></th></tr></thead>
+    <tbody>
+    {% for p in packages %}
+      <tr>
+        <td>{{ p.title or 'Untitled' }}</td>
+        <td>{{ p.company or '' }}</td>
+        <td><span class="badge section">{{ p.status }}</span></td>
+        <td style="color: var(--muted);">{{ p.created_at.strftime('%d %b, %H:%M') }}</td>
+        <td style="text-align: right;"><a href="/job/writer/{{ p.id }}">Open</a></td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+{% endblock %}

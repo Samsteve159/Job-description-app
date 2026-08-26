@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import logging
 import re
-from dataclasses import dataclass, field, asdict
+from dataclasses import asdict, dataclass, field, fields
 from typing import Any, Dict, List, Optional
 
 from modules.llm import complete_json
@@ -81,6 +81,16 @@ class Extraction:
 
     def as_dict(self) -> Dict[str, Any]:
         return asdict(self)
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "Extraction":
+        """Rebuild from what as_dict() stored. Reopening a package costs no model call."""
+        data = dict(data or {})
+        must = [Requirement(**r) for r in data.pop("must", []) or []]
+        nice = [Requirement(**r) for r in data.pop("nice", []) or []]
+        known = {f.name for f in fields(cls)}
+        return cls(must=must, nice=nice,
+                   **{k: v for k, v in data.items() if k in known})
 
 
 class NotAJobDescription(ValueError):

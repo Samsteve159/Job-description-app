@@ -1,0 +1,154 @@
+{% extends "base.html" %}
+{% block title %}{{ package.title or 'Review' }}{% endblock %}
+{% block body %}
+
+<h1>{{ package.title or 'Untitled role' }}</h1>
+<p class="lead">
+  {% if package.company %}{{ package.company }}{% endif %}
+  {% if extraction %} &middot; {{ extraction.seniority }} &middot; {{ extraction.archetype }}{% endif %}
+  &middot; <a href="/job/writer">start another</a>
+</p>
+
+{% if contact_warnings %}
+<div class="notice warn">
+  <strong>Before you send this</strong>
+  <ul>{% for w in contact_warnings %}<li>{{ w }}</li>{% endfor %}</ul>
+  <a href="/job/details">Edit my details</a>
+</div>
+{% endif %}
+
+<!-- ------------------------------------------------------------ what it asked for -->
+<h2>What the job asked for</h2>
+<div class="panel">
+  <div class="split">
+    <div>
+      <h3>Must have</h3>
+      {% for r in must %}
+        <div style="font-size: 14px; margin-bottom: 5px;">
+          {{ r.text }}
+          {% if r.keyword %}<span class="pill {{ 'hit' if r.keyword in hit_keywords else 'miss' }}">{{ r.keyword }}</span>{% endif %}
+        </div>
+      {% else %}<p class="hint">None extracted.</p>{% endfor %}
+    </div>
+    <div>
+      <h3>Nice to have</h3>
+      {% for r in nice %}
+        <div style="font-size: 14px; margin-bottom: 5px; color: var(--muted);">{{ r.text }}</div>
+      {% else %}<p class="hint">None extracted.</p>{% endfor %}
+    </div>
+  </div>
+</div>
+
+<!-- ------------------------------------------------------------------- blocks -->
+<h2>What it wrote</h2>
+<p class="lead" style="margin-bottom: 14px;">
+  Green lines cite your facts directly and render as they are. Amber lines reach further,
+  so nothing goes on the page until you tick it. Red lines cited nothing real and cannot be
+  exported at all.
+</p>
+
+<form method="post" action="/job/writer/{{ package.id }}/accept">
+{% for block in blocks %}
+  <div class="block {{ block.grade }}">
+    <div class="block-head">
+      <span class="badge {{ block.grade }}">{{ block.grade }}</span>
+      <span class="badge section">{{ block.section }}{% if block.org %} &middot; {{ block.org }}{% endif %}</span>
+      {% if block.grade in ('inferred', 'stretch') %}
+      <label class="accept">
+        <input type="checkbox" name="accept" value="{{ block.id }}"
+               {% if block.accepted %}checked{% endif %}>
+        use this
+      </label>
+      {% endif %}
+    </div>
+    <div class="block-text">{{ block.text }}</div>
+    <div class="block-meta">
+      {% if block.fact_ids %}
+        cites
+        {% for fid in block.fact_ids %}<a href="#fact-{{ fid }}" title="{{ facts.get(fid, '') }}">#{{ fid }}</a>{% if not loop.last %}, {% endif %}{% endfor %}
+      {% else %}cites nothing{% endif %}
+      {% if block.rationale %} &middot; {{ block.rationale }}{% endif %}
+    </div>
+    {% if block.grade in ('inferred', 'stretch') and block.fact_ids %}
+      <div class="block-meta" style="border-top: 1px solid var(--line); margin-top: 8px; padding-top: 8px;">
+        {% for fid in block.fact_ids %}{% if facts.get(fid) %}
+          <div id="fact-{{ fid }}" style="margin-bottom: 3px;"><strong>#{{ fid }}</strong> {{ facts[fid] }}</div>
+        {% endif %}{% endfor %}
+      </div>
+    {% endif %}
+  </div>
+{% endfor %}
+
+{% if rejected %}
+  <h2>Refused by the truth gate</h2>
+  <p class="lead" style="margin-bottom: 12px;">
+    These never reached the review. Kept so you can see what the model tried.
+  </p>
+  {% for text, why in rejected %}
+    <div class="block blocked">
+      <div class="block-head"><span class="badge blocked">{{ why }}</span></div>
+      <div class="block-text">{{ text }}</div>
+    </div>
+  {% endfor %}
+{% endif %}
+
+  <div class="actions">
+    <button type="submit" name="action" value="save">Save choices</button>
+    <button type="submit" name="action" value="render" class="secondary">Save and build the resume</button>
+  </div>
+</form>
+
+<!-- --------------------------------------------------------------- ats report -->
+{% if report %}
+<h2>Applicant tracking system check</h2>
+<div class="panel">
+  <div style="display: flex; align-items: baseline; gap: 16px; flex-wrap: wrap;">
+    <div class="score">{{ report.score }}<small>/100</small></div>
+    <div>
+      {% if report.passed %}
+        <span class="badge verified">export allowed</span>
+      {% else %}
+        <span class="badge blocked">export refused</span>
+      {% endif %}
+      <div class="hint" style="margin-top: 4px;">
+        must-have keywords {{ report.must.values() | select | list | length }}/{{ report.must | length }}
+      </div>
+    </div>
+    {% if report.passed and package.resume_path %}
+      <a class="button" style="margin-left: auto;"
+         href="/job/writer/{{ package.id }}/download">Download the .docx</a>
+    {% endif %}
+  </div>
+
+  {% if report.blocking %}
+    <div class="notice bad" style="margin-top: 16px;">
+      <strong>Blocking</strong>
+      <ul>{% for b in report.blocking %}<li>{{ b }}</li>{% endfor %}</ul>
+    </div>
+  {% endif %}
+  {% if report.warnings %}
+    <div class="notice warn" style="margin-top: 10px;">
+      <strong>Worth fixing, not blocking</strong>
+      <ul>{% for w in report.warnings %}<li>{{ w }}</li>{% endfor %}</ul>
+    </div>
+  {% endif %}
+
+  <h3 style="margin-top: 18px;">What a parser reads</h3>
+  <dl class="kv">
+    <dt>Name</dt><dd>{{ report.parsed.name or 'not found' }}</dd>
+    <dt>Email</dt><dd>{{ report.parsed.email or 'not found' }}</dd>
+    <dt>Phone</dt><dd>{{ report.parsed.phone or 'not found' }}</dd>
+    <dt>Sections</dt><dd>{{ report.parsed.sections | join(', ') or 'none' }}</dd>
+    <dt>Dates</dt><dd>{{ report.parsed.date_ranges | join(' &middot; ') | safe or 'none' }}</dd>
+  </dl>
+
+  {% if report.missing_must() %}
+    <h3 style="margin-top: 18px;">Keywords not on the page</h3>
+    <div class="pill-row">
+      {% for k in report.missing_must() %}<span class="pill miss">{{ k }}</span>{% endfor %}
+    </div>
+  {% endif %}
+</div>
+{% endif %}
+
+{% endblock %}

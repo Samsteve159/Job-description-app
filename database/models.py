@@ -3,7 +3,8 @@
 Two families of tables that must never touch each other:
 
   Sections 1 and 2 (Scout Finds, Resume & Cover Writer)
-      ContactDetail, ProfileFact, Find, Requirement, Package, GeneratedBlock
+      ContactDetail, ProfileFact, Find, Requirement, Package, GeneratedBlock,
+      Application
 
   Section 3 (Interview Brief) -- fully standalone
       Brief
@@ -129,6 +130,8 @@ class Package(Base):
     job_text = Column(Text, nullable=False)
     company = Column(String(256), nullable=True)
     title = Column(String(256), nullable=True)
+    # the whole Extraction, so reopening a package costs no model call
+    extraction = Column(JSON, default=dict)
     resume_path = Column(Text, nullable=True)
     cover_path = Column(Text, nullable=True)
     screening = Column(JSON, default=dict)
@@ -162,6 +165,49 @@ class GeneratedBlock(Base):
     rationale = Column(Text, nullable=True)   # why the model reached, shown in review
     accepted = Column(Boolean, default=False)
     order_index = Column(Integer, default=0)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+# ------------------------------------------------------------- application tracker
+
+class Application(Base):
+    """One job actually applied for, and what happened next.
+
+    Deliberately separate from Package. A Package is something this app wrote; an
+    Application is something Sameer sent. Most applications will never have a Package
+    (Easy Apply, a form on a company site, a recruiter email) and a Package can exist for
+    a job never applied to. Joining them into one row would force every real application
+    to carry an empty resume record, and every draft to look like an application.
+
+    `source` records how the app learned about it, because that governs how much to
+    trust the row. A manual entry is authoritative. An inbox match is a guess with a
+    message id attached so it can be re-checked.
+    """
+    __tablename__ = "applications"
+
+    id = Column(Integer, primary_key=True)
+    package_id = Column(Integer, ForeignKey("packages.id"), nullable=True)
+    find_id = Column(Integer, ForeignKey("finds.id"), nullable=True)
+
+    company = Column(String(256), nullable=True)
+    title = Column(String(256), nullable=True)
+    url = Column(Text, nullable=True)
+    # manual | gmail | easy_apply | external | package
+    source = Column(String(16), default="manual", index=True)
+    # applied | acknowledged | screening | interview | offer | rejected | ghosted
+    status = Column(String(16), default="applied", index=True)
+    # the furthest stage ever reached. Status alone loses it: an interview that ends in
+    # a rejection reads as "rejected", and a funnel built from that shows a candidate
+    # who was never interviewed. The high-water mark is what the funnel counts.
+    furthest_status = Column(String(16), default="applied")
+    applied_at = Column(DateTime, default=datetime.utcnow, index=True)
+    last_event_at = Column(DateTime, nullable=True)
+    notes = Column(Text, nullable=True)
+
+    # set when a row came from an inbox scan, so the same email is never counted twice
+    external_ref = Column(String(256), nullable=True, index=True)
+    confidence = Column(Float, nullable=True)     # 0-1, only meaningful for scanned rows
+    active = Column(Boolean, default=True)        # soft delete
     created_at = Column(DateTime, default=datetime.utcnow)
 
 

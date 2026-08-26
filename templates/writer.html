@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}Resume &amp; Cover Writer{% endblock %}
+{% block body %}
+<h1>Resume &amp; Cover Writer</h1>
+<p class="lead">
+  Give it a job description. It writes a resume where every line traces back to something
+  you actually did, then checks the file will survive an applicant tracking system before
+  it lets you export.
+</p>
+
+<form method="post" action="/job/writer/analyse">
+  <div class="panel">
+    <label for="url">Job URL</label>
+    <input type="text" id="url" name="url" placeholder="https://careers.example.com/jobs/1234"
+           value="{{ url or '' }}">
+    <p class="hint">
+      LinkedIn, Naukri and Glassdoor refuse automated fetches, so for those paste the
+      description below instead. Everything else is worth trying.
+    </p>
+  </div>
+
+  <div class="panel">
+    <label for="job_text">Or paste the description</label>
+    <textarea id="job_text" name="job_text"
+              placeholder="Paste the whole posting. Requirements, responsibilities, the lot.">{{ job_text or '' }}</textarea>
+    <p class="hint">If both are filled in, the pasted text wins.</p>
+  </div>
+
+  <div class="actions">
+    <button type="submit">Analyse the job</button>
+    <span class="hint">Takes about ten seconds. Two model calls, both on the free tier.</span>
+  </div>
+</form>
+
+{% if packages %}
+<h2>Earlier packages</h2>
+<div class="panel tight">
+  <table>
+    <thead><tr><th>Role</th><th>Company</th><th>Status</th><th>Created</th><th></th></tr></thead>
+    <tbody>
+    {% for p in packages %}
+      <tr>
+        <td>{{ p.title or 'Untitled' }}</td>
+        <td>{{ p.company or '' }}</td>
+        <td><span class="badge section">{{ p.status }}</span></td>
+        <td style="color: var(--muted);">{{ p.created_at.strftime('%d %b, %H:%M') }}</td>
+        <td style="text-align: right;"><a href="/job/writer/{{ p.id }}">Open</a></td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+{% endblock %}

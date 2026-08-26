@@ -42,31 +42,75 @@ find-and-copy work, so it becomes plain Python when the adapters land.
 | # | Slice | Status |
 |---|---|---|
 | 0 | Backbone: config, models, db, LLM router, prompts, renderer | done, tested |
-| 1 | Writer core: `extract`, `tailor`, truth guards, ATS gate | **done, run live** |
-| 2 | `fetch_jd`: job URL to clean JD text | next. Needs no key |
-| 3 | App shell: `main.py`, `run.command`, three-section nav | not started. **This is what a local link needs** |
+| 1 | Writer core: `extract`, `tailor`, truth guards, ATS gate | done, run live |
+| 2 | `fetch_jd`: job URL to clean JD text | **done, run against real postings** |
+| 3 | App shell: modules, dashboard, tracker, `run.command` | **done. It opens in a browser** |
 | 4 | Scout adapters and Scout Finds | blocked on Adzuna / RapidAPI keys |
 | 5 | VM worker and sync | blocked on SSH + tunnel hostname |
 | 6 | Cover letter and screening answers | not started |
 | 7 | Interview Brief | not started |
+| 8 | Gmail application scan | **blocked on a Google Cloud OAuth client** |
+| 9 | Post Writer module | blocked on a port-or-rebuild decision |
+
+## Running it
+
+```bash
+./run.command          # or: python3 main.py
+```
+
+Serves on `http://127.0.0.1:8100`. The loopback bind is the security boundary, which is
+why there is no login. `main.py` warns if HOST is ever set to anything else.
+
+Two modules, Job App and Post Writer, with a switcher in the header. Job App lands on a
+dashboard: applications sent, how many are live, how many reached a human, how far they
+got. Packages sit below it. Errors are modals rather than a strip at the top of the page,
+because an export being refused is not something to find out later.
+
+Light and dark follow the OS by default with an explicit override that survives a reload,
+applied before first paint so a dark-mode user never sees a white flash.
+
+## The bake-off, and what it settled
+
+`scripts/bakeoff.py` runs one JD through several models repeatedly and measures keyword
+coverage, spread across runs, fabricated citations, drifted numbers, wrong tenure and
+non-ASCII output. It disables the fallback first, because measuring a model with a safety
+net armed measures the safety net.
+
+| Model | Mean coverage | Spread | Secs | Notes |
+|---|---|---|---|---|
+| `nim:openai/gpt-oss-120b` | 61%, then 100% | 45%, then 0% | 20s | Fast. Inconsistent between sessions |
+| `nim:minimaxai/minimax-m3` | 100% on its one completed run | n/a | 38s | **Rate limited, HTTP 429 on the free tier** |
+| `nim:nvidia/nemotron-3-super-120b-a12b` | n/a | n/a | n/a | Unparseable JSON on every run |
+| `anthropic:claude-sonnet-5` | 64% | 57% | 86s | Swings as much as the free model, at four times the latency |
+
+**The finding that matters: the instability is prompt-side, not model-side.** Claude, at
+real money per call, swings 57 points on the same measure. Paying more would not have
+fixed it. Keyword placement needs a deterministic pass. That is the next writer job.
+
+Two bugs found on the way:
+
+- `max_tokens=6000` truncated Claude mid-JSON on two runs in three, which presents as a
+  model that cannot follow a schema. It was a budget, not a capability. Now 12000
+- `temperature` is deprecated for `claude-sonnet-5`, which returns 400 at any value but
+  the default. That took the fallback down on its first real health check. `modules/llm.py`
+  now learns which models reject it and retries without it once
 
 ## What is proven
 
 ```
-tests/test_guards.py                          34 passed, 0 failed
-tests/test_ats.py                             29 passed, 0 failed
-
-scripts/run_job.py, live, Wells Fargo JD:
-  extract   title, company, location, seniority and archetype all correct
-            12 must-haves, 14 nice-to-haves, 42 keywords
-  tailor    12 to 13 blocks, 0 rejected, citations all real
-  render    ATS-safe docx, five headings, contact block extracts
-  ATS gate  blocked the export on keyword coverage, which is the gate working
+tests/test_ats.py        29      the ATS gate against real rejection modes
+tests/test_contact.py    23      contact details, and surviving a re-seed
+tests/test_fetch_jd.py   30      refusing login walls and bot checks
+tests/test_guards.py     34      citations, numbers, tenure, headcount, the render gate
+tests/test_tracker.py    28      counting, the high-water mark, silence
+tests/test_webapp.py     40      every screen, and that a screen cannot skip a gate
+                        ---
+                        184 passing
 ```
 
-Both money figures the model produced (`$19.3M`, `$120M`) traced to the metrics of the facts
-it cited. The citation and number guards behave on real output the way they behave on
-fixtures.
+The webapp suite's most important case: accept a reaching block, build, untick it, and
+the download closes again. Without that, unticking left the passing file on disk and the
+download route served it, because that route checks the file rather than the choices.
 
 ## What the first live run exposed, and what was done about it
 
@@ -103,23 +147,22 @@ The second run said "10 years of experience". Computed figure is 9.8.
 
 | | Blocks |
 |---|---|
-| Anthropic key | The fallback, and the bake-off that would settle model choice |
-| Adzuna app id + key, RapidAPI key (both free tier) | Slice 4 only |
-| SSH access + spare tunnel hostname | Slice 5 only |
+| **Google Cloud project + OAuth client for Gmail** | Counting applications automatically. Only he can create it |
+| Adzuna app id + key, RapidAPI key (both free tier) | Scout Finds |
+| SSH access + spare tunnel hostname | The always-on VM worker |
+| Port the existing Post Writer in, or rebuild it here | Module two |
 
-### Four unverified facts
+### Three unverified facts
 
 In `data/profile_facts.json`, excluded from citation until confirmed and flipped to
-`"verified": true`. The live run withheld all four.
+`"verified": true`. Every live run withheld them.
 
 1. **Notice period**, and whether November 2026 availability still holds
-2. **Expected CTC** range in INR
-3. **Reason for moving back to India**, in your own words. First thing every Indian
-   recruiter asks, so it belongs in the answer bank in your phrasing
-4. **Phone number** is an Australian mobile, and it is currently rendering on the resume.
-   Indian recruiters call
+2. **Expected CTC** range in INR. Currently literal `PLACEHOLDER` text
+3. **Reason for moving back to India**, in his own words
 
----
+The phone number is settled: it stays Australian, and `modules/contact.warnings()`
+mentions it without blocking.
 
 ## Settled decisions
 
@@ -144,4 +187,5 @@ Full rationale in `DECISIONS.md`. The ones most likely to be re-litigated:
 | Date | What happened |
 |---|---|
 | 25 Aug 2026 | Backbone built. `extract` and `tailor` written, 20 guard tests passing. Model routing researched and corrected against the live catalogue. Moved into the project root. Paused |
+| 26 Aug 2026 (later) | App shell: two modules, dashboard, tracker, modal errors, light and dark. `fetch_jd` done. Bake-off run, which found the variance is prompt-side not model-side. Tests 63 to 184 |
 | 26 Aug 2026 | First live run, Wells Fargo Lead Treasury Analyst JD. `scripts/run_job.py` added to drive the whole pipeline from one command. Two defects found and fixed: non-ASCII punctuation reaching the page, and tenure claims going unchecked. Tests 41 to 63 |

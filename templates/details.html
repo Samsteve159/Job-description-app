@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block title %}My Details{% endblock %}
+{% block body %}
+<h1>My Details</h1>
+<p class="lead">
+  Name, email, phone and address. The writer reads them from here, so this is the only
+  place they need changing. Re-seeding your career facts does not touch them.
+</p>
+
+{% if warnings %}
+<div class="notice warn">
+  <ul>{% for w in warnings %}<li>{{ w }}</li>{% endfor %}</ul>
+</div>
+{% endif %}
+
+<div class="panel">
+  <h3>How it prints on the resume</h3>
+  <div style="font-family: ui-monospace, Menlo, monospace; font-size: 13px; color: var(--ink);
+              background: var(--bg); padding: 14px; border-radius: 6px;">
+    <strong style="font-size: 16px;">{{ name or '(no name set)' }}</strong><br>
+    {{ lines | join(' | ') or '(nothing set to print)' }}
+  </div>
+</div>
+
+<div class="panel">
+  <table>
+    <thead><tr><th>Detail</th><th>Value</th><th>On the resume</th><th></th></tr></thead>
+    <tbody>
+    {% for d in details %}
+      <tr>
+        <td style="width: 110px;"><span class="badge section">{{ d.kind }}</span></td>
+        <td>
+          <form method="post" action="/job/details/set" style="display: flex; gap: 8px;">
+            <input type="hidden" name="kind" value="{{ d.kind }}">
+            <input type="text" name="value" value="{{ d.value }}">
+            <button type="submit" class="secondary">Save</button>
+          </form>
+        </td>
+        <td style="width: 130px;">
+          <form method="post" action="/job/details/visibility">
+            <input type="hidden" name="detail_id" value="{{ d.id }}">
+            <input type="hidden" name="renders" value="{{ 'off' if d.renders else 'on' }}">
+            <button type="submit" class="secondary">
+              {{ 'shown' if d.renders else 'hidden' }}
+            </button>
+          </form>
+        </td>
+        <td></td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<div class="panel">
+  <h3>Add a detail</h3>
+  <form method="post" action="/job/details/set">
+    <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+      <select name="kind" style="padding: 9px 10px; border: 1px solid var(--line); border-radius: 6px;">
+        {% for k in kinds %}<option value="{{ k }}">{{ k }}</option>{% endfor %}
+      </select>
+      <input type="text" name="value" placeholder="value" style="flex: 1; min-width: 240px;">
+      <button type="submit">Add</button>
+    </div>
+    <p class="hint">
+      An address is stored but kept off the resume unless you show it. City and country is
+      the convention there, and a street address is a privacy cost that buys nothing.
+    </p>
+  </form>
+</div>
+{% endblock %}
