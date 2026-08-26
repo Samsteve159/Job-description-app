@@ -56,6 +56,17 @@ def measure(extraction, facts, actual_years) -> Dict:
     elapsed = time.time() - started
 
     text = " ".join(b.text for b in result.blocks)
+
+    # Coverage over what would actually reach the page, which is not the same thing as
+    # coverage over everything the model wrote. An unaccepted reaching block never
+    # renders, so counting its keywords measures an intention rather than a resume. The
+    # earlier version of this script counted them, which is part of why a model that
+    # fabricated more scored better.
+    renders = " ".join(b.text for b in result.blocks if b.grade == "verified").lower()
+    wanted = list(result.keyword_hits) or []
+    honest = (100.0 * sum(1 for k in wanted if k in renders) / len(wanted)) if wanted else 0.0
+    placement = result.placement
+    unsupported = len(placement.unsupported) if placement else 0
     dirt = sorted({c for c in text if ord(c) > 127})
     grades = {g: sum(1 for b in result.blocks if b.grade == g)
               for g in ("verified", "inferred", "stretch")}
@@ -70,7 +81,9 @@ def measure(extraction, facts, actual_years) -> Dict:
 
     return {
         "secs": elapsed,
-        "coverage": result.coverage,
+        "coverage": honest,
+        "claimed": result.coverage,
+        "unsupported": unsupported,
         "blocks": len(result.blocks),
         "rejected": len(result.rejected),
         "fabricated": fabricated,
@@ -153,7 +166,8 @@ def main() -> int:
     print("-" * 88)
     for model, runs in results.items():
         cov = [r["coverage"] for r in runs]
-        bad = sum(r["fabricated"] + r["drifted"] + r["tenure_wrong"] for r in runs)
+        bad = sum(r["fabricated"] + r["drifted"] + r["tenure_wrong"]
+                  + r["unsupported"] for r in runs)
         print(
             f"{model:<38} {statistics.mean(cov):>5.0f}% "
             f"{max(cov) - min(cov):>6.0f}% "
@@ -163,9 +177,11 @@ def main() -> int:
             f"{bad:>4} {sum(r['dirt'] for r in runs):>5}"
         )
 
-    print("\ncover   mean must-have keyword coverage. The ATS floor is 70%")
+    print("\ncover   mean coverage over blocks that would actually render, not over")
+    print("        everything the model wrote. The ATS floor is 70%")
     print("spread  best run minus worst. High means you cannot trust one run")
-    print("bad     fabricated citations + drifted numbers + wrong tenure, all runs")
+    print("bad     fabricated citations + drifted numbers + wrong tenure +")
+    print("        unsupported skill claims, summed across all runs")
     print("dirt    non-ASCII characters the renderer had to normalise away")
 
     ranked = sorted(

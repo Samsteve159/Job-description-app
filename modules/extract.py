@@ -13,6 +13,7 @@ import re
 from dataclasses import asdict, dataclass, field, fields
 from typing import Any, Dict, List, Optional
 
+from modules import keywords as keyword_tools
 from modules.llm import complete_json
 
 log = logging.getLogger(__name__)
@@ -182,10 +183,35 @@ def extract(jd_text: str) -> Extraction:
         jd_text=jd_text,
     )
 
-    # keywords should be a superset of the per requirement keywords, whatever the model did
-    merged = set(result.keywords)
-    merged.update(r.keyword for r in result.all_requirements if r.keyword)
-    result.keywords = sorted(merged)
+    # A requirement can exist without being a searchable term, and conflating the two is
+    # what made the ATS score unstable. One run returned "measurement and continuous
+    # improvement" and "ai use case identification" as must-have keywords: phrases no
+    # resume contains and no filter screens on, each one sitting in the denominator
+    # pushing coverage toward the threshold that refuses the export. The requirement text
+    # is kept and still shown; only its claim to be a keyword is dropped.
+    dropped = []
+    for requirement in result.all_requirements:
+        if requirement.keyword and not keyword_tools.usable_keyword(requirement.keyword):
+            dropped.append(requirement.keyword)
+            requirement.keyword = ""
+
+    # and the same test over the loose keyword list, deduplicated by meaning
+    result.keywords = keyword_tools.sanitise(
+        sorted(set(result.keywords)) + [r.keyword for r in result.all_requirements if r.keyword],
+        limit=40,
+    )
+
+    # cap the must-have set. Beyond about a dozen, a job description is listing its
+    # wishes rather than its filter, and every extra term makes the score noisier.
+    kept = keyword_tools.sanitise([r.keyword for r in result.must if r.keyword])
+    for requirement in result.must:
+        if requirement.keyword and requirement.keyword.lower() not in kept:
+            dropped.append(requirement.keyword)
+            requirement.keyword = ""
+
+    if dropped:
+        log.info("extract: dropped %d unusable keyword(s): %s",
+                 len(dropped), ", ".join(dropped[:8]))
 
     if not result.must:
         log.warning(

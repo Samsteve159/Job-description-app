@@ -193,6 +193,7 @@ def analyse(request: Request, db: Session = Depends(get_db),
         company=extraction.company,
         title=extraction.title,
         extraction=extraction.as_dict(),
+        placement=(result.placement.as_dict() if result.placement else {}),
         status="draft",
     )
     db.add(package)
@@ -240,6 +241,8 @@ def _package_view(request: Request, db: Session, package: Package,
 
     contact_module.bootstrap(db)
     return render(request, "review.html", section="writer", _db=db,
+                  placement=package.placement or {},
+                  fact_count=len(fact_rows),
                   package=package, extraction=extraction,
                   must=extraction.must, nice=extraction.nice,
                   blocks=shown, rejected=rejected, facts=facts,

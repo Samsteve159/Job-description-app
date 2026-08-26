@@ -83,9 +83,10 @@ net armed measures the safety net.
 | `nim:nvidia/nemotron-3-super-120b-a12b` | n/a | n/a | n/a | Unparseable JSON on every run |
 | `anthropic:claude-sonnet-5` | 64% | 57% | 86s | Swings as much as the free model, at four times the latency |
 
-**The finding that matters: the instability is prompt-side, not model-side.** Claude, at
-real money per call, swings 57 points on the same measure. Paying more would not have
-fixed it. Keyword placement needs a deterministic pass. That is the next writer job.
+**What it actually found, which was worse than inconsistency.** The high-coverage runs
+were the ones where the model invented more. The word "risk" appears in **none** of the 63
+career facts, and runs kept producing "supporting liquidity risk management" against a
+real fact id, passing every guard. Coverage was measuring fabrication and rewarding it.
 
 Two bugs found on the way:
 
@@ -95,6 +96,49 @@ Two bugs found on the way:
   the default. That took the fallback down on its first real health check. `modules/llm.py`
   now learns which models reject it and retries without it once
 
+## Keyword placement, and the fabrication it exposed
+
+`modules/keywords.py` places must-have keywords deterministically, with no model involved.
+Three fixes, in order of how much they mattered:
+
+**1. The denominator was full of things nobody writes on a resume.** `extract` was
+returning "measurement and continuous improvement" and "ai use case identification" as
+must-have keywords. No resume contains those strings and no filter screens on them, but
+each one sat in the denominator pushing coverage toward the threshold that refuses the
+export. `usable_keyword()` drops them on a head-noun test: a real search term ends in a
+thing (`sql`, `owner`, `management`), a described requirement ends in an abstraction
+(`identification`, `judgment`, `improvement`). The requirement text is kept and still
+shown; only its claim to be a keyword is dropped.
+
+**2. Keywords that are genuinely supported are now placed, not hoped for.** Evidence has
+three strengths and they are graded differently on purpose. Exact and variant matches are
+the same claim written differently, so they render. A token match is this module asserting
+a relationship, so it waits for a tick.
+
+**3. A block can cite a real fact and still claim a skill that fact does not show.** The
+citation guard never saw this: it checks the fact id exists and the numbers came from it,
+not that the sentence's claim is supported. `unsupported()` catches it. Affected blocks
+are downgraded to amber rather than blocked, because a reframing may still be fair and
+this app's position is that aggressive reframing is the product. It just stops rendering
+unsupervised.
+
+### The result
+
+| | Wells Fargo, treasury and product owner | Procurement analytics, his actual field |
+|---|---|---|
+| Coverage | 43%, **0% spread over four runs** | 96%, 5 of 5 must-haves |
+| Genuine gaps | 6 | 0 |
+| Unsupported claims caught | 3, every run | 0 |
+| Verdict | refused, flagged as a stretch | passes on verified content alone |
+
+The variance is gone. What replaced it is a number that means something: 43% is the honest
+read on a job asking for product ownership, agile delivery and balance sheet risk, none of
+which appear anywhere in the record. The app now says so instead of manufacturing a pass.
+
+**`bakeoff.py` was itself measuring the wrong thing** and now measures coverage over blocks
+that would actually render, rather than over everything the model wrote. An unaccepted
+reaching block never reaches the page, so counting its keywords scored an intention.
+
 ## What is proven
 
 ```
@@ -102,10 +146,11 @@ tests/test_ats.py        29      the ATS gate against real rejection modes
 tests/test_contact.py    23      contact details, and surviving a re-seed
 tests/test_fetch_jd.py   30      refusing login walls and bot checks
 tests/test_guards.py     34      citations, numbers, tenure, headcount, the render gate
+tests/test_keywords.py   62      placement, the head-noun test, unsupported claims
 tests/test_tracker.py    28      counting, the high-water mark, silence
 tests/test_webapp.py     40      every screen, and that a screen cannot skip a gate
                         ---
-                        184 passing
+                        246 passing
 ```
 
 The webapp suite's most important case: accept a reaching block, build, untick it, and
@@ -133,13 +178,12 @@ The second run said "10 years of experience". Computed figure is 9.8.
 
 ## What is still unproven
 
-- **Keyword placement.** The live run put 57% of must-have terms on the page against a 70%
-  floor, so the export was refused. Some gaps are real (product owner, backlog management).
-  Some are the model choosing its own words for something you have done (corporate treasury,
-  data validation). Worth a bake-off before deciding it is a model problem or a prompt one
-- **Run-to-run stability.** Three runs of the same JD produced materially different bullets
-  and coverage between 57% and 88%. That variance is the strongest argument for a bake-off
 - **Cover letter prose.** Never generated
+- **Whether the gaps are real or the record is thin.** "risk" appearing in zero facts is
+  suspicious for someone who ran treasury operations at an energy company. The likeliest
+  reading is that `profile_facts.json` under-describes that work, not that he never did
+  it. Worth a pass through the Puma Energy entries. The app cannot fix this: adding risk
+  language it cannot evidence is exactly what it refuses to do
 
 ---
 
@@ -187,5 +231,6 @@ Full rationale in `DECISIONS.md`. The ones most likely to be re-litigated:
 | Date | What happened |
 |---|---|
 | 25 Aug 2026 | Backbone built. `extract` and `tailor` written, 20 guard tests passing. Model routing researched and corrected against the live catalogue. Moved into the project root. Paused |
+| 26 Aug 2026 (evening) | Deterministic keyword placement. Spread went from 44% to 0%, and the fix uncovered that high coverage had been measuring fabrication. New guard for skill claims no fact supports. Tests 184 to 246 |
 | 26 Aug 2026 (later) | App shell: two modules, dashboard, tracker, modal errors, light and dark. `fetch_jd` done. Bake-off run, which found the variance is prompt-side not model-side. Tests 63 to 184 |
 | 26 Aug 2026 | First live run, Wells Fargo Lead Treasury Analyst JD. `scripts/run_job.py` added to drive the whole pipeline from one command. Two defects found and fixed: non-ASCII punctuation reaching the page, and tenure claims going unchecked. Tests 41 to 63 |

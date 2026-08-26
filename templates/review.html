@@ -39,6 +39,68 @@
   </div>
 </div>
 
+<!-- ---------------------------------------------------------------- keywords -->
+{% if placement %}
+{% if placement.unsupported %}
+<div class="notice bad">
+  <strong>The writing claims things your record does not back</strong>
+  <p style="margin: 6px 0 0; font-size: 14px;">
+    Nothing in your {{ fact_count }} facts supports these. The lines saying so were
+    downgraded, so they will not go on the page unless you tick them.
+  </p>
+  <div class="pill-row" style="margin-top: 8px;">
+    {% for term in placement.unsupported %}<span class="pill miss">{{ term }}</span>{% endfor %}
+  </div>
+</div>
+{% endif %}
+
+{% if placement.is_a_stretch %}
+<div class="notice warn">
+  <strong>This job asks for more than your record covers</strong>
+  <p style="margin: 6px 0 0; font-size: 14px;">
+    Worth knowing before you spend an evening on the cover letter. Applying anyway is a
+    perfectly reasonable choice, it just should be a choice.
+  </p>
+</div>
+{% endif %}
+
+<h2>Keywords</h2>
+<div class="panel">
+  <p class="hint" style="margin-top: 0;">{{ placement.summary }}</p>
+
+  {% if placement.added %}
+  <h3 style="margin-top: 14px;">Placed, because a fact supports them</h3>
+  {% for item in placement.added %}
+    <div class="block {{ item.grade }}" style="margin-bottom: 7px;">
+      <div class="block-head">
+        <span class="badge {{ item.grade }}">{{ item.strength }}</span>
+        <strong style="color: var(--ink);">{{ item.keyword }}</strong>
+      </div>
+      <div class="block-meta">#{{ item.fact_ids | join(', #') }} &middot; {{ item.quote }}</div>
+    </div>
+  {% endfor %}
+  {% endif %}
+
+  {% if placement.gaps %}
+  <h3 style="margin-top: 16px;">Genuine gaps</h3>
+  <p class="hint" style="margin-top: 0;">
+    No fact supports these, so they stay off the page. This is the honest read on the job,
+    not a bug. If you have done one of them, add it to your facts and run this again.
+  </p>
+  <div class="pill-row">
+    {% for term in placement.gaps %}<span class="pill miss">{{ term }}</span>{% endfor %}
+  </div>
+  {% endif %}
+
+  {% if placement.already_present %}
+  <h3 style="margin-top: 16px;">Already on the page</h3>
+  <div class="pill-row">
+    {% for term in placement.already_present %}<span class="pill hit">{{ term }}</span>{% endfor %}
+  </div>
+  {% endif %}
+</div>
+{% endif %}
+
 <!-- ------------------------------------------------------------------- blocks -->
 <h2>What it wrote</h2>
 <p class="lead" style="margin-bottom: 14px;">

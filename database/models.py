@@ -132,6 +132,10 @@ class Package(Base):
     title = Column(String(256), nullable=True)
     # the whole Extraction, so reopening a package costs no model call
     extraction = Column(JSON, default=dict)
+    # what keyword placement decided: what it added, what has no support, what is a
+    # genuine gap. Stored because it is the most useful thing on the review screen and
+    # recomputing it would mean re-running the stage that produced the text
+    placement = Column(JSON, default=dict)
     resume_path = Column(Text, nullable=True)
     cover_path = Column(Text, nullable=True)
     screening = Column(JSON, default=dict)

@@ -26,6 +26,7 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 
 from config import config
+from modules import keywords
 from modules.llm import complete_json
 from modules.prompts import ATS_CONTRACT, HOUSE_STYLE, NO_HEADCOUNT, TRUTH_CONTRACT
 from modules.render_docx import ResumePayload, Role
@@ -116,6 +117,7 @@ class TailorResult:
     blocks: List[Block] = field(default_factory=list)
     rejected: List[Tuple[Block, str]] = field(default_factory=list)
     keyword_hits: Dict[str, bool] = field(default_factory=dict)
+    placement: Optional[Any] = None      # keywords.Placement, set by tailor()
 
     @property
     def needs_review(self) -> List[Block]:
@@ -421,6 +423,49 @@ def tailor(extraction: Any, facts: Sequence[Any]) -> TailorResult:
         (result.rejected.append((checked, reason)) if reason
          else result.blocks.append(checked))
 
+    # Deterministic keyword placement. The model does this unreliably enough that
+    # coverage swung 45 to 57 points across runs on every model tested, which decides
+    # whether the resume is read by a person. See modules/keywords.py.
+    written = " ".join(b.text for b in result.blocks)
+    current_skills = [
+        s.strip()
+        for b in result.blocks if b.section == "skills"
+        for s in b.text.split("|") if s.strip()
+    ]
+    result.placement = keywords.place(
+        written,
+        must=extraction.must_keywords(),
+        nice=[r.keyword for r in extraction.nice if r.keyword],
+        facts=citable,
+        skills=current_skills,
+    )
+    # A block asserting a skill nothing in the record supports is downgraded rather than
+    # blocked. Blocking would be wrong: the sentence may still be a fair reframing of the
+    # fact it cites, and this app's whole position is that aggressive reframing is the
+    # product. But it stops rendering unsupervised. He looks at it and decides.
+    if result.placement.unsupported:
+        for block in result.blocks:
+            claimed = [
+                term for term in result.placement.unsupported
+                if term.lower() in block.text.lower()
+                or " ".join(keywords.significant(term)) in " ".join(keywords.tokens(block.text))
+            ]
+            if not claimed:
+                continue
+            note = ("no fact supports " + ", ".join(f"{c!r}" for c in claimed[:3]))
+            block.rationale = f"{block.rationale}. {note}" if block.rationale else note.capitalize()
+            if block.grade == "verified":
+                block.grade = "inferred"
+                log.warning("downgraded to inferred, %s: %r", note, block.text[:70])
+
+    for block in keywords.as_blocks(result.placement, Block):
+        checked, reason = _validate(block, known, actual_years)
+        if reason:
+            log.warning("keyword placement block rejected by the gate: %s", reason)
+            result.rejected.append((checked, reason))
+        else:
+            result.blocks.append(checked)
+
     rendered = " ".join(b.text for b in result.blocks).lower()
     result.keyword_hits = {kw: kw in rendered for kw in extraction.must_keywords()}
 
@@ -452,8 +497,19 @@ def to_payload(
     role_by_org = {r.org: r for r in roles if r.org}
 
     summary = next((b.text for b in result.blocks if b.section == "summary" and usable(b)), "")
-    skills_block = next((b for b in result.blocks if b.section == "skills" and usable(b)), None)
-    skills = [s.strip() for s in skills_block.text.split("|")] if skills_block else []
+    # Every usable skills block, not just the first. Keyword placement adds a second and
+    # sometimes a third, graded separately, and taking only the first would silently drop
+    # whichever ones a human had just agreed to.
+    skills: List[str] = []
+    seen_skills = set()
+    for block in sorted((b for b in result.blocks if b.section == "skills" and usable(b)),
+                        key=lambda b: b.order_index):
+        for item in block.text.split("|"):
+            item = item.strip()
+            key = item.lower()
+            if item and key not in seen_skills:
+                seen_skills.add(key)
+                skills.append(item)
 
     experience: List[Role] = []
     for role in roles:

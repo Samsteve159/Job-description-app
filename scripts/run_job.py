@@ -109,6 +109,32 @@ def main() -> int:
             print(f"  {i:>2} {mark}{b.section:<10} cites {b.fact_ids}")
             print(f"       {b.text}")
 
+        placement = result.placement
+        if placement is not None:
+            banner("KEYWORDS")
+            print(placement.summary_line())
+            if placement.added:
+                print("\nplaced deterministically, because a fact supports them:")
+                for evidence in placement.added:
+                    mark = "ok " if evidence.grade == "verified" else "~~ "
+                    print(f"  {mark}{evidence.keyword:<34} {evidence.strength:<8} "
+                          f"#{evidence.fact_ids}")
+                    print(f"       {evidence.quote[:90]}")
+            if placement.unsupported:
+                print("\nUNSUPPORTED. The writing claims these and nothing in your record")
+                print("backs them. The blocks saying so were downgraded for review:")
+                for term in placement.unsupported:
+                    print(f"  !! {term}")
+            if placement.gaps:
+                print("\nGENUINE GAPS. No fact supports these, so they stay off the page:")
+                for term in placement.gaps:
+                    print(f"  -- {term}")
+            if placement.dropped:
+                print(f"\ndropped at the skills cap: {', '.join(placement.dropped)}")
+            if placement.is_a_stretch:
+                print("\n  This job asks for more than your record covers. That is worth")
+                print("  knowing before you spend an evening on the cover letter.")
+
         missing = [k for k, hit in result.keyword_hits.items() if not hit]
         if missing:
             print(f"\nmust-have keywords not placed: {', '.join(missing)}")

@@ -1,0 +1,28 @@
+Manager, Procurement Analytics
+Mumbai, India. Hybrid. Global capability centre of a multinational.
+
+About the role
+You will own spend analytics end to end for a global procurement organisation, from raw
+ERP and invoice data through to the savings case the business acts on.
+
+Responsibilities
+Own spend analysis across categories, from data ingestion to the recommendation
+Build and maintain the reporting layer in Power BI, on models you design yourself
+Audit supplier categorisation against UNSPSC taxonomy and keep it current
+Run supplier master data management and deduplication
+Identify savings opportunities and build the commercial case for each
+Reconcile published figures to source systems so numbers survive challenge
+Partner with finance on the financial impact of procurement decisions
+
+Required
+6+ years in spend analytics or procurement analytics
+Advanced SQL for data transformation against large relational databases
+Power BI or Tableau to a build standard, not just consumption
+Hands-on experience with UNSPSC taxonomy and supplier master data
+Demonstrated data quality and reconciliation discipline
+
+Nice to have
+Python for data pipelines
+Machine learning applied to classification of spend data
+FP&A exposure and comfort presenting to finance leadership
+Experience with automation of manual reporting processes
