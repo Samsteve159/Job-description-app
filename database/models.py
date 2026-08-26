@@ -3,7 +3,7 @@
 Two families of tables that must never touch each other:
 
   Sections 1 and 2 (Scout Finds, Resume & Cover Writer)
-      ProfileFact, Find, Requirement, Package, GeneratedBlock
+      ContactDetail, ProfileFact, Find, Requirement, Package, GeneratedBlock
 
   Section 3 (Interview Brief) -- fully standalone
       Brief
@@ -21,6 +21,34 @@ from sqlalchemy.orm import DeclarativeBase
 
 class Base(DeclarativeBase):
     pass
+
+
+# ------------------------------------------------------------------- contact details
+
+class ContactDetail(Base):
+    """Name, email, phone and address. Edited in the app, never seeded.
+
+    These began life as ProfileFact rows, which was wrong the moment they became
+    editable: seed_profile.py wipes and reloads ProfileFact because the JSON file is the
+    source of truth for the career record. Contact details are the opposite. The app is
+    the source of truth for them, so a re-seed must not be able to revert a phone number
+    Sameer changed last week. Different lifecycle, different table.
+
+    `renders` exists because not every detail belongs on the page. A full street address
+    is worth storing for application forms and worth leaving off a resume, where city and
+    country is the convention and the rest is only a privacy cost.
+    """
+    __tablename__ = "contact_details"
+
+    id = Column(Integer, primary_key=True)
+    # name | email | phone | location | address | link
+    kind = Column(String(32), nullable=False, index=True)
+    label = Column(String(64), nullable=True)     # "mobile", "india", shown in the UI only
+    value = Column(Text, nullable=False)
+    renders = Column(Boolean, default=True)       # goes in the resume contact line
+    order_index = Column(Integer, default=0)      # left to right on the page
+    active = Column(Boolean, default=True)        # soft delete
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
 # --------------------------------------------------------------- career source of truth

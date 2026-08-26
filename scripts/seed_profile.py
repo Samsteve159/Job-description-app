@@ -17,7 +17,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from config import config                      # noqa: E402
 from database.db import SessionLocal, init_db  # noqa: E402
-from database.models import ProfileFact        # noqa: E402
+from database.models import ProfileFact  # noqa: E402
+from modules.contact import bootstrap        # noqa: E402
 
 SEED_FILE = config.data_dir / "profile_facts.json"
 
@@ -79,6 +80,13 @@ def main() -> int:
 
         if not args.dry_run:
             db.commit()
+            # Imports name, email, phone and the rest into ContactDetail, but only on a
+            # database that has none yet. After that the app owns them, and wiping
+            # ProfileFact above must not take an edited phone number down with it.
+            imported = bootstrap(db)
+            if imported:
+                print(f"  contact details imported: {imported} "
+                      f"(edit them with scripts/contact.py, not this file)")
 
         total = sum(counts.values())
         print(f"{'would seed' if args.dry_run else 'seeded'} {total} facts:")

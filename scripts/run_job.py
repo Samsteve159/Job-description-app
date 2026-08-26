@@ -26,6 +26,8 @@ from config import config  # noqa: E402
 from database.db import get_db, init_db  # noqa: E402
 from database.models import ProfileFact  # noqa: E402
 from modules.ats import AtsBlocked, check, gate as ats_gate  # noqa: E402
+from modules.contact import (bootstrap, display_name,  # noqa: E402
+                             resume_lines, warnings as contact_warnings)
 from modules.extract import NotAJobDescription, extract  # noqa: E402
 from modules.render_docx import BlockedContentError, render_resume  # noqa: E402
 from modules.tailor import tailor, to_payload  # noqa: E402
@@ -122,7 +124,11 @@ def main() -> int:
 
         # ------------------------------------------------------------- render
         banner("RENDER")
-        payload = to_payload(result, facts)
+        bootstrap(db)
+        for warning in contact_warnings(db):
+            print(f"  contact: {warning}")
+        payload = to_payload(result, facts,
+                             contact=resume_lines(db), name=display_name(db))
         out = args.out or (config.base_dir / "data" / "output" /
                            f"{args.jd.stem}.docx")
         out.parent.mkdir(parents=True, exist_ok=True)

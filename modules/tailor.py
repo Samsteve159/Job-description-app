@@ -427,6 +427,8 @@ def to_payload(
     result: TailorResult,
     facts: Sequence[Any],
     include_unaccepted: bool = False,
+    contact: Optional[Sequence[str]] = None,
+    name: Optional[str] = None,
 ) -> ResumePayload:
     """Assemble accepted blocks plus verbatim facts into something renderable.
 
@@ -477,8 +479,13 @@ def to_payload(
             out.append(line)
         return out
 
-    contact = [f.text for f in facts if f.kind == "contact"]
-    name = next((f.text for f in facts if f.kind == "name"), "")
+    # Contact details come from ContactDetail when the caller supplies them, because the
+    # app owns those and a re-seed must not revert them. Falling back to the facts keeps
+    # the old path working for a database that predates the table.
+    if contact is None:
+        contact = [f.text for f in facts if f.kind == "contact"]
+    if not name:
+        name = next((f.text for f in facts if f.kind == "name"), "")
 
     return ResumePayload(
         name=name,
