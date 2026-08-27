@@ -152,6 +152,38 @@ with TestClient(app) as client:
     check("an explicit light choice can override a dark OS",
           ':root:not([data-theme="light"])' in css)
 
+    print("\nthe analyse screen")
+    r = client.get("/job/writer")
+    forms = r.text.count('action="/job/writer/analyse"')
+    check("there are two ways in, each with its own button", forms == 2, forms)
+    buttons = r.text.count('type="submit"')
+    check("and each has exactly one submit", buttons == 2, buttons)
+    check("the link form submits on its own", 'id="urlGo"' in r.text)
+    check("no rule about which input wins is needed any more",
+          "the pasted text wins" not in r.text)
+    check("blocked boards are named before he submits, not after",
+          "linkedin.com" in r.text and "HTTP 999" in r.text)
+    check("and the text box is offered as the way round it",
+          "the only way in for LinkedIn" in r.text)
+    check("sites that do work are named too",
+          "Greenhouse" in r.text and "Workday" in r.text)
+
+    check("a skeleton is shown while it waits", "showSkeleton" in r.text
+          and "sk-line" in r.text)
+    check("the stages named are the real ones",
+          "cites a fact" in r.text and "Scoring the fit" in r.text)
+    check("and it gives up rather than animating forever",
+          "took longer than it should have" in r.text and "120000" in r.text)
+    check("giving up tells him nothing was half-saved",
+          "nothing is half-written" in r.text)
+    css = client.get("/static/app.css").text
+    check("the skeleton has styles to match", ".sk-line" in css and "sk-sweep" in css)
+    check("and it stops moving if the viewer asked for less motion",
+          "prefers-reduced-motion" in css)
+
+    check("the theme control says what it is, not just its state",
+          "Theme: " in r.text and 'title=' in r.text)
+
     print("\ninput handling")
     r = client.post("/job/writer/analyse", data={"url": "", "job_text": ""},
                     follow_redirects=True)

@@ -1,47 +1,67 @@
 {% extends "base.html" %}
 {% block title %}Resume &amp; Cover Writer{% endblock %}
 {% block body %}
-<h1>Resume &amp; Cover Writer</h1>
+<h1>Analyse a job</h1>
 <p class="lead">
-  Give it a job description. It writes a resume where every line traces back to something
-  you actually did, then checks the file will survive an applicant tracking system before
-  it lets you export.
+  Two ways in, and each one runs the whole thing: reads the posting, works out what it
+  wants, writes a resume where every line traces to something you actually did, and checks
+  the file will survive an applicant tracking system.
 </p>
 
-<form method="post" action="/job/writer/analyse">
-  <div class="panel">
-    <label for="url">Job URL</label>
-    <input type="text" id="url" name="url" placeholder="https://careers.example.com/jobs/1234"
-           value="{{ url or '' }}">
-    <p class="hint">
-      LinkedIn, Naukri and Glassdoor refuse automated fetches, so for those paste the
-      description below instead. Everything else is worth trying.
-    </p>
-  </div>
+<div class="split">
+  <!-- ---------------------------------------------------------------- by link -->
+  <form method="post" action="/job/writer/analyse" data-analyse>
+    <div class="panel" style="height: 100%; display: flex; flex-direction: column;">
+      <h3>From a link</h3>
+      <p class="hint" style="margin-top: 0;">
+        Company career pages and the systems behind them: Greenhouse, Lever, Workday,
+        SmartRecruiters, and most <code>careers.company.com</code> pages.
+      </p>
+      <input type="text" id="url" name="url" autocomplete="off"
+             placeholder="https://careers.example.com/jobs/1234" value="{{ url or '' }}">
+      <div id="urlWarn" class="notice warn" style="display: none; margin: 10px 0 0;"></div>
+      <div class="actions" style="margin-top: auto; padding-top: 14px;">
+        <button type="submit" id="urlGo">Fetch and analyse</button>
+      </div>
+    </div>
+  </form>
 
-  <div class="panel">
-    <label for="job_text">Or paste the description</label>
-    <textarea id="job_text" name="job_text"
-              placeholder="Paste the whole posting. Requirements, responsibilities, the lot.">{{ job_text or '' }}</textarea>
-    <p class="hint">If both are filled in, the pasted text wins.</p>
-  </div>
+  <!-- ---------------------------------------------------------------- by text -->
+  <form method="post" action="/job/writer/analyse" data-analyse>
+    <div class="panel" style="height: 100%; display: flex; flex-direction: column;">
+      <h3>From the text</h3>
+      <p class="hint" style="margin-top: 0;">
+        Always works, and the only way in for LinkedIn, Naukri and Glassdoor. Select the
+        whole posting, copy, paste.
+      </p>
+      <textarea id="job_text" name="job_text" style="flex: 1; min-height: 170px;"
+                placeholder="Paste the whole posting. Requirements, responsibilities, the lot.">{{ job_text or '' }}</textarea>
+      <div class="actions" style="margin-top: auto; padding-top: 14px;">
+        <button type="submit">Analyse this</button>
+      </div>
+    </div>
+  </form>
+</div>
 
-  <div class="actions">
-    <button type="submit">Analyse the job</button>
-    <span class="hint">Takes about ten seconds. Two model calls, both on the free tier.</span>
-  </div>
-</form>
+<p class="hint" style="margin-top: 4px;">
+  About thirty seconds either way. Two model calls, both on the free tier.
+</p>
 
 {% if packages %}
 <h2>Earlier packages</h2>
 <div class="panel tight">
   <table>
-    <thead><tr><th>Role</th><th>Company</th><th>Status</th><th>Created</th><th></th></tr></thead>
+    <thead><tr><th>Role</th><th>Company</th><th>Fit</th><th>Status</th><th>Created</th><th></th></tr></thead>
     <tbody>
     {% for p in packages %}
       <tr>
         <td>{{ p.title or 'Untitled' }}</td>
         <td>{{ p.company or '' }}</td>
+        <td>
+          {% if p.fit and p.fit.score is defined %}
+            <span class="badge {{ 'verified' if p.fit.band == 'green' else ('inferred' if p.fit.band == 'amber' else 'blocked') }}">{{ p.fit.score }}</span>
+          {% endif %}
+        </td>
         <td><span class="badge section">{{ p.status }}</span></td>
         <td style="color: var(--muted);">{{ p.created_at.strftime('%d %b, %H:%M') }}</td>
         <td style="text-align: right;"><a href="/job/writer/{{ p.id }}">Open</a></td>
@@ -51,4 +71,112 @@
   </table>
 </div>
 {% endif %}
+
+<script>
+  // Hosts that answer automated clients with a refusal. Told to him as he types rather
+  // than after thirty seconds of waiting, because the round trip teaches him nothing he
+  // could not have been told immediately.
+  var REFUSES = {
+    "linkedin.com": "LinkedIn answers automated clients with HTTP 999. No header set changes that.",
+    "naukri.com": "Naukri blocks automated fetches.",
+    "glassdoor.com": "Glassdoor blocks automated fetches.",
+    "indeed.com": "Indeed blocks automated fetches."
+  };
+
+  var urlBox = document.getElementById("url");
+  var warn = document.getElementById("urlWarn");
+  var urlGo = document.getElementById("urlGo");
+
+  function hostOf(value) {
+    try {
+      var raw = value.trim();
+      if (!raw) { return ""; }
+      if (!/^https?:\/\//i.test(raw)) { raw = "https://" + raw; }
+      return new URL(raw).hostname.toLowerCase().replace(/^www\./, "");
+    } catch (e) { return ""; }
+  }
+
+  function checkUrl() {
+    var host = hostOf(urlBox.value);
+    var hit = null;
+    Object.keys(REFUSES).forEach(function (blocked) {
+      if (host === blocked || host.endsWith("." + blocked)) { hit = blocked; }
+    });
+    if (hit) {
+      warn.style.display = "block";
+      warn.innerHTML = "<strong>" + REFUSES[hit] + "</strong><br>" +
+        "Open it in your browser, select the description, and paste it into the box on " +
+        "the right. Takes five seconds and does not get your account restricted.";
+      urlGo.disabled = true;
+    } else {
+      warn.style.display = "none";
+      urlGo.disabled = false;
+    }
+  }
+  if (urlBox) {
+    urlBox.addEventListener("input", checkUrl);
+    urlBox.addEventListener("paste", function () { setTimeout(checkUrl, 0); });
+    checkUrl();
+  }
+
+  // A skeleton rather than a spinner, because the wait is long enough that a spinner
+  // reads as a hang. The stages are the real ones and they advance on a timer, which is
+  // honest enough: they are what is happening, just not measured.
+  var STAGES = [
+    "Reading the posting",
+    "Working out what the job actually wants",
+    "Matching it against your record",
+    "Writing, and checking every line cites a fact",
+    "Scoring the fit"
+  ];
+
+  document.querySelectorAll("form[data-analyse]").forEach(function (form) {
+    form.addEventListener("submit", function (event) {
+      var url = form.querySelector("[name=url]");
+      var text = form.querySelector("[name=job_text]");
+      var hasInput = (url && url.value.trim()) || (text && text.value.trim());
+      if (!hasInput) { event.preventDefault(); return; }
+      showSkeleton();
+    });
+  });
+
+  function showSkeleton() {
+    var main = document.querySelector("main");
+    main.innerHTML =
+      '<h1>Analysing</h1>' +
+      '<p class="lead" id="stage">' + STAGES[0] + '...</p>' +
+      '<div class="panel"><div class="sk sk-line w60"></div>' +
+      '<div class="sk sk-line w90"></div><div class="sk sk-line w75"></div></div>' +
+      '<div class="split">' +
+      '<div class="panel"><div class="sk sk-line w40"></div><div class="sk sk-line"></div>' +
+      '<div class="sk sk-line w80"></div><div class="sk sk-line w65"></div></div>' +
+      '<div class="panel"><div class="sk sk-line w40"></div><div class="sk sk-line"></div>' +
+      '<div class="sk sk-line w70"></div><div class="sk sk-line w85"></div></div></div>' +
+      '<div class="panel"><div class="sk sk-line w50"></div><div class="sk sk-line"></div>' +
+      '<div class="sk sk-line w95"></div><div class="sk sk-line w80"></div>' +
+      '<div class="sk sk-line w60"></div></div>';
+
+    var index = 0;
+    var ticker = setInterval(function () {
+      index = Math.min(index + 1, STAGES.length - 1);
+      var el = document.getElementById("stage");
+      if (el) { el.textContent = STAGES[index] + "..."; }
+    }, 6000);
+
+    // The skeleton replaced the page, so if the request never comes back there is
+    // nothing left to fall back to and it animates forever. Found the honest way: the
+    // server had died and this sat there looking busy. A stuck screen that claims to be
+    // working is worse than an error.
+    setTimeout(function () {
+      clearInterval(ticker);
+      var main = document.querySelector("main");
+      main.innerHTML =
+        '<div class="notice bad"><strong>That took longer than it should have.</strong>' +
+        '<p style="margin: 6px 0 0;">Either a model call is hanging or the app is not ' +
+        'running. Check the terminal you started it from, then try again. Nothing was ' +
+        'saved, so nothing is half-written.</p></div>' +
+        '<div class="actions"><a class="button" href="/job/writer">Back to the form</a></div>';
+    }, 120000);
+  }
+</script>
 {% endblock %}

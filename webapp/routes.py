@@ -147,6 +147,9 @@ def writer_form(request: Request, db: Session = Depends(get_db), error: str = ""
 def analyse(request: Request, db: Session = Depends(get_db),
             url: str = Form(""), job_text: str = Form("")):
     """URL or pasted text to a saved package. Two model calls, then the truth gate."""
+    # Each form submits one field, so there is no longer a rule about which input wins
+    # when both are filled in. There was one, it was "the pasted text", and nobody could
+    # have guessed it from looking at the screen.
     text = clean(job_text)
     if not text and url.strip():
         try:

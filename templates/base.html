@@ -27,7 +27,8 @@
       <a href="/job" class="{{ 'active' if module == 'job' }}">Job App</a>
       <a href="/posts" class="{{ 'active' if module == 'posts' }} soon">Post Writer</a>
     </div>
-    <button class="theme-toggle" type="button" onclick="cycleTheme()" id="themeBtn">Theme</button>
+    <button class="theme-toggle" type="button" onclick="cycleTheme()" id="themeBtn"
+            title="Light or dark. Auto follows your Mac's setting.">Theme</button>
   </div>
   {% if module == 'job' %}
   <div class="subnav">
@@ -97,8 +98,17 @@
     paintThemeButton();
   }
   function paintThemeButton() {
+    // Labelled with what it is, not just what it is set to. "Auto" on its own was a word
+    // in the corner of the screen that nobody could be expected to decode.
     var b = document.getElementById("themeBtn");
-    if (b) { b.textContent = { system: "Auto", dark: "Dark", light: "Light" }[currentTheme()]; }
+    if (!b) { return; }
+    var state = currentTheme();
+    b.textContent = "Theme: " + { system: "Auto", dark: "Dark", light: "Light" }[state];
+    b.title = {
+      system: "Following your Mac's light or dark setting. Click to force dark.",
+      dark: "Forced dark. Click to force light.",
+      light: "Forced light. Click to go back to following your Mac."
+    }[state];
   }
   paintThemeButton();
 </script>
