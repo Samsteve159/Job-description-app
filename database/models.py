@@ -142,6 +142,8 @@ class Package(Base):
     placement = Column(JSON, default=dict)
     # the fit score and the components behind it, so the number can always be argued with
     fit = Column(JSON, default=dict)
+    # the drafted cover letter: paragraphs, what each cites, and what was refused
+    cover = Column(JSON, default=dict)
     resume_path = Column(Text, nullable=True)
     cover_path = Column(Text, nullable=True)
     screening = Column(JSON, default=dict)

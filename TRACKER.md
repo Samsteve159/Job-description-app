@@ -54,7 +54,7 @@ find-and-copy work, so it becomes plain Python when the adapters land.
 | 3 | App shell: modules, dashboard, tracker, `run.command` | **done. It opens in a browser** |
 | 4 | Scout adapters and Scout Finds | blocked on Adzuna / RapidAPI keys |
 | 5 | VM worker and sync | blocked on SSH + tunnel hostname |
-| 6 | Cover letter | not started |
+| 6 | Cover letter | **done** |
 | 7 | Interview Brief | not started |
 | 8 | Gmail application scan | **blocked on a Google Cloud OAuth client** |
 | 10 | Fit score, 1 to 100, red/amber/green | **done** |
@@ -175,6 +175,32 @@ candidate list's order, which let the model back in through the side door. It re
 keywords in a different order each run, so equally-emphasised terms swapped places and a
 different twelve survived. Ties now break alphabetically.
 
+## Cover letters
+
+`modules/cover.py`. Career claims go through `tailor._validate` verbatim rather than a
+second copy, because a duplicated safety check is a second one to forget to update.
+
+The guard the resume never needed is `unverifiable_company_claims`. A cover letter makes
+claims about *them* as well, and no citation check would notice: a paragraph can cite a
+perfectly real fact about his SQL work while opening with "I have long admired your
+commitment to innovation", which invents a company fact and a feeling about it in one
+sentence. Anything said about the employer now has to be traceable to the posting text.
+
+Also enforced rather than requested:
+
+- **Cliches are refused, not discouraged.** Every model reaches for "I am writing to
+  apply", "passionate about" and "proven track record", and a prompt saying not to is a
+  suggestion. Nineteen of them are checked against the output
+- **Length.** 90 to 300 words, judged on the draft rather than on what has been accepted.
+  Judging it on the accepted text warned that a fresh letter was too thin, when the only
+  reason was that nothing had been ticked yet
+- **An empty letter is refused at render.** A page containing a greeting and a signature
+  is worse than no file, because it looks like it worked
+
+Same acceptance model as the resume, and the same invalidation: change your mind about a
+paragraph and the built file is deleted, so the download cannot serve a letter that no
+longer matches the choices behind it.
+
 ## Gap closer, and the direction the override runs in
 
 The truth gate stops a model inventing experience. It had also started stopping Sameer
@@ -202,15 +228,16 @@ unevidenced. It asks a question, and what he types becomes the evidence.
 ```
 tests/test_ats.py        29      the ATS gate against real rejection modes
 tests/test_contact.py    23      contact details, and surviving a re-seed
+tests/test_cover.py      36      cliches, invented praise, word counts, rendering
 tests/test_fetch_jd.py   30      refusing login walls and bot checks
 tests/test_fit.py        32      every way a fit score flatters the person reading it
-tests/test_guards.py     34      citations, numbers, tenure, headcount, the render gate
 tests/test_gaps.py       28      adjacency, refusing to ask, writing back to the JSON
+tests/test_guards.py     34      citations, numbers, tenure, headcount, the render gate
 tests/test_keywords.py   77      placement, the head-noun test, emphasis, unsupported claims
 tests/test_tracker.py    28      counting, the high-water mark, silence
-tests/test_webapp.py     46      every screen, and that a screen cannot skip a gate
+tests/test_webapp.py     69      every screen, and that a screen cannot skip a gate
                         ---
-                        327 passing
+                        446 passing
 ```
 
 The webapp suite's most important case: accept a reaching block, build, untick it, and
@@ -295,6 +322,7 @@ Full rationale in `DECISIONS.md`. The ones most likely to be re-litigated:
 | Date | What happened |
 |---|---|
 | 25 Aug 2026 | Backbone built. `extract` and `tailor` written, 20 guard tests passing. Model routing researched and corrected against the live catalogue. Moved into the project root. Paused |
+| 27 Aug 2026 (later) | Cover letters. Analyse screen split into two paths with skeletons and instant host warnings. Tests 341 to 446 |
 | 27 Aug 2026 | Fit score built: 1 to 100, red/amber/green, weighted by what the posting leans on and counted against the facts rather than the draft. Same posting now reuses its extraction, so closing a gap and rewriting cannot move the score for the wrong reason. Screening answers dropped. Tests 295 to 327 |
 | 26 Aug 2026 (night) | Gap closer built: asks about work the record does not cover, writes his answers back to the JSON. `extract` stopped deciding its own denominator. minimax-m3 dropped from every route, rate limited to 0 of 4. Tests 246 to 295 |
 | 26 Aug 2026 (evening) | Deterministic keyword placement. Spread went from 44% to 0%, and the fix uncovered that high coverage had been measuring fabrication. New guard for skill claims no fact supports. Tests 184 to 246 |

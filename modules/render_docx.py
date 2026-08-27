@@ -240,6 +240,68 @@ HOSTILE_TAGS = {
 }
 
 
+@dataclass
+class CoverPayload:
+    name: str
+    contact: List[str]
+    greeting: str = "Dear Hiring Manager,"
+    paragraphs: List[str] = field(default_factory=list)
+    sign_off: str = "Kind regards,"
+    role: str = ""
+    company: str = ""
+    date_line: str = ""
+
+
+def render_cover(payload: CoverPayload, out_path: Path) -> Path:
+    """Write an ATS-safe cover letter.
+
+    Same constraints as the resume, for the same reason: some systems parse the cover
+    letter too, and the ones that do not still store it as a file somebody opens. No
+    tables, no headers, no text boxes, and every run through plain_text.
+
+    Refuses an empty letter rather than writing a page containing a greeting and a
+    signature, which is worse than no file at all because it looks like it worked.
+    """
+    body = [p for p in payload.paragraphs if (p or "").strip()]
+    if not body:
+        raise BlockedContentError(
+            "a cover letter with no paragraphs is not a cover letter. Accept at least "
+            "one, or fix what the truth gate refused"
+        )
+
+    out_path = Path(out_path)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+
+    doc = Document()
+    _configure(doc)
+
+    p = doc.add_paragraph()
+    run = p.add_run(plain_text(payload.name))
+    run.bold = True
+    run.font.size = Pt(15)
+    run.font.name = BODY_FONT
+    run.font.color.rgb = INK
+
+    if payload.contact:
+        _line(doc, " | ".join(payload.contact), muted=True)
+    if payload.date_line:
+        _line(doc, payload.date_line, muted=True, space_before=10)
+
+    if payload.role or payload.company:
+        subject = "Application: " + " at ".join(
+            part for part in (payload.role, payload.company) if part)
+        _line(doc, subject, bold=True, space_before=12)
+
+    _line(doc, payload.greeting, space_before=12)
+    for text in body:
+        _line(doc, text, space_before=8)
+
+    _line(doc, payload.sign_off, space_before=14)
+    _line(doc, payload.name)
+    doc.save(str(out_path))
+    return out_path
+
+
 def audit(path: Path) -> Dict[str, object]:
     """Re-open a rendered docx and report what a parser would actually see."""
     import zipfile

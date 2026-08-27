@@ -238,6 +238,54 @@ with TestClient(app) as client:
     r = client.get(f"/job/writer/{pid}/download", follow_redirects=False)
     check("unticking closes the export again", r.status_code == 303, r.status_code)
 
+    print("\ncover letter")
+    # Seeded rather than generated, so this exercises the screens and the gate without a
+    # model call. cover.write is covered in tests/test_cover.py.
+    from database.models import Package as _Pkg
+    _db = next(get_db())
+    _p = _db.get(_Pkg, pid)
+    _p.cover = {
+        "greeting": "Dear Hiring Manager,", "sign_off": "Kind regards,",
+        "paragraphs": [
+            {"text": "Ran spend analysis in SQL against UNSPSC categories.",
+             "fact_ids": [4], "grade": "verified", "accepted": False, "order_index": 0},
+            {"text": "That is the same problem your posting describes.",
+             "fact_ids": [4], "grade": "inferred", "accepted": False, "order_index": 1},
+        ],
+        "rejected": [{"text": "I am writing to apply for this role.",
+                      "why": "cliche: 'i am writing to apply'"}],
+        "warnings": [],
+    }
+    _db.commit(); _db.close()
+
+    r = client.get(f"/job/writer/{pid}")
+    check("the letter shows on the review screen", "Dear Hiring Manager," in r.text)
+    check("what the gate refused is shown, not hidden",
+          "Refused before you saw them" in r.text and "i am writing to apply" in r.text)
+    para = re.findall(r'name="para" value="(\d+)"', r.text)
+    check("only the reaching paragraph needs a tick", para == ["1"], para)
+
+    r = client.post(f"/job/writer/{pid}/cover/accept", data={"action": "build"},
+                    follow_redirects=True)
+    check("it builds on the verified paragraph alone", "Cover letter built" in r.text)
+    r = client.get(f"/job/writer/{pid}/cover/download", follow_redirects=False)
+    check("the letter downloads", r.status_code == 200, r.status_code)
+    check("it is a real docx", r.content[:2] == b"PK")
+    check("the filename says what it is",
+          "Cover-Letter" in r.headers.get("content-disposition", ""),
+          r.headers.get("content-disposition"))
+
+    r = client.post(f"/job/writer/{pid}/cover/accept",
+                    data={"action": "build", "para": ["1"]}, follow_redirects=True)
+    check("ticking the reaching paragraph makes it longer",
+          "Cover letter built" in r.text)
+
+    # and the same rule as the resume: changing your mind discards the built file
+    client.post(f"/job/writer/{pid}/cover/accept", data={"action": "save"})
+    r = client.get(f"/job/writer/{pid}/cover/download", follow_redirects=False)
+    check("changing the choices discards the stale letter",
+          r.status_code == 303, r.status_code)
+
     print("\ngap closer")
     # SEED_FILE is redirected so a test can never append to the real career record.
     import json as _json, tempfile as _tf

@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import hashlib
 import logging
+from datetime import date
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -24,13 +25,14 @@ from sqlalchemy.orm import Session
 from config import config
 from database.db import get_db
 from database.models import GeneratedBlock, Package, ProfileFact
-from modules import fit, gaps, tracker
+from modules import cover, fit, gaps, tracker
 from modules import contact as contact_module
 from modules.ats import AtsBlocked, check as ats_check
 from modules.extract import Extraction, NotAJobDescription, extract
 from modules.fetch_jd import FetchError, clean, fetch
 from modules.llm import LLMError
-from modules.render_docx import BlockedContentError, render_resume
+from modules.render_docx import (BlockedContentError, CoverPayload,  # noqa: E501
+                                 audit, render_cover, render_resume)
 from modules.tailor import Block, TailorResult, tailor, to_payload
 
 log = logging.getLogger(__name__)
@@ -274,6 +276,7 @@ def _package_view(request: Request, db: Session, package: Package,
     contact_module.bootstrap(db)
     return render(request, "review.html", section="writer", _db=db,
                   placement=package.placement or {},
+                  cover=_cover_from(package) if package.cover else None,
                   fit=package.fit or {},
                   fact_count=len(fact_rows),
                   orgs=gaps.roles(fact_rows),
@@ -319,6 +322,13 @@ def accept(request: Request, package_id: int, db: Session = Depends(get_db),
     if action != "render":
         return RedirectResponse(f"/job/writer/{package_id}", status_code=303)
     return _build(request, db, package)
+
+
+def _drop_file(path_str: str) -> None:
+    try:
+        Path(path_str).unlink(missing_ok=True)
+    except OSError as exc:  # a locked file must not take the request down
+        log.warning("could not remove %s: %s", path_str, exc)
 
 
 def _invalidate(package: Package) -> None:
@@ -478,6 +488,128 @@ def rewrite(request: Request, package_id: int, db: Session = Depends(get_db)):
                  else f" Fit unchanged at {after}.")
     return _package_view(request, db, package,
                          message=f"Written again against the same posting.{moved}")
+
+
+# -------------------------------------------------------------------- cover letter
+
+def _cover_from(package: Package) -> cover.CoverLetter:
+    """Rebuild the stored letter, so acceptance and rendering share one shape."""
+    stored = package.cover or {}
+    letter = cover.CoverLetter(
+        greeting=stored.get("greeting") or "Dear Hiring Manager,",
+        sign_off=stored.get("sign_off") or "Kind regards,",
+        warnings=list(stored.get("warnings") or []),
+    )
+    for index, item in enumerate(stored.get("paragraphs") or []):
+        letter.paragraphs.append(Block(
+            section="cover", text=item.get("text", ""),
+            fact_ids=list(item.get("fact_ids") or []),
+            grade=item.get("grade", "inferred"),
+            rationale=item.get("rationale"),
+            accepted=bool(item.get("accepted")),
+            order_index=item.get("order_index", index),
+        ))
+    letter.rejected = [(Block(section="cover", text=r.get("text", ""), grade="blocked"),
+                        r.get("why", "refused"))
+                       for r in (stored.get("rejected") or [])]
+    return letter
+
+
+@router.post("/job/writer/{package_id}/cover")
+def cover_write(request: Request, package_id: int, db: Session = Depends(get_db)):
+    package = db.get(Package, package_id)
+    if package is None or not package.extraction:
+        return RedirectResponse("/job/writer", status_code=303)
+
+    extraction = Extraction.from_dict(package.extraction)
+    facts = db.query(ProfileFact).order_by(ProfileFact.order_index).all()
+    # what the resume already says, so the letter builds on it rather than repeating it
+    written = db.query(GeneratedBlock).filter(
+        GeneratedBlock.package_id == package.id,
+        GeneratedBlock.section == "experience",
+        GeneratedBlock.grade == "verified",
+    ).order_by(GeneratedBlock.order_index).all()
+
+    try:
+        letter = cover.write(extraction, facts, resume_blocks=written)
+    except (LLMError, RuntimeError) as exc:
+        return _package_view(request, db, package, error=str(exc),
+                             error_title="Could not draft the letter")
+
+    package.cover = letter.as_dict()
+    db.commit()
+    return RedirectResponse(f"/job/writer/{package_id}#cover", status_code=303)
+
+
+@router.post("/job/writer/{package_id}/cover/accept")
+def cover_accept(request: Request, package_id: int, db: Session = Depends(get_db),
+                 para: List[int] = Form(default=[]), action: str = Form("save")):
+    # `para`, not `accept`: the resume form's checkboxes carry database ids and these
+    # carry list positions. Two different things under one name is the kind of overlap
+    # that costs an afternoon the first time a form gets moved.
+    package = db.get(Package, package_id)
+    if package is None or not package.cover:
+        return RedirectResponse("/job/writer", status_code=303)
+
+    stored = dict(package.cover)
+    chosen = set(para)
+    paragraphs = []
+    for index, item in enumerate(stored.get("paragraphs") or []):
+        item = dict(item)
+        if item.get("grade") in ("inferred", "stretch"):
+            item["accepted"] = index in chosen
+        paragraphs.append(item)
+    stored["paragraphs"] = paragraphs
+    package.cover = stored
+    if package.cover_path:
+        _drop_file(package.cover_path)      # the choices moved, so the file is stale
+        package.cover_path = None
+    db.commit()
+
+    if action != "build":
+        return RedirectResponse(f"/job/writer/{package_id}#cover", status_code=303)
+
+    letter = _cover_from(package)
+    contact_module.bootstrap(db)
+    payload = CoverPayload(
+        name=contact_module.display_name(db),
+        contact=contact_module.resume_lines(db),
+        greeting=letter.greeting,
+        paragraphs=[b.text for b in letter.usable],
+        sign_off=letter.sign_off,
+        role=package.title or "",
+        company=package.company or "",
+        date_line=date.today().strftime("%d %B %Y"),
+    )
+    out = OUTPUT_DIR / f"package-{package.id}-cover.docx"
+    try:
+        path = render_cover(payload, out)
+    except BlockedContentError as exc:
+        return _package_view(request, db, package, error=str(exc),
+                             error_title="Nothing to put in the letter")
+
+    package.cover_path = str(path)
+    db.commit()
+    report = audit(path)
+    message = f"Cover letter built, {letter.word_count} words."
+    if not report["ok"]:
+        return _package_view(request, db, package,
+                             error="; ".join(str(x) for x in report["problems"]),
+                             error_title="The letter would not parse cleanly")
+    return _package_view(request, db, package, message=message)
+
+
+@router.get("/job/writer/{package_id}/cover/download")
+def cover_download(package_id: int, db: Session = Depends(get_db)):
+    package = db.get(Package, package_id)
+    if package is None or not package.cover_path:
+        return RedirectResponse("/job/writer", status_code=303)
+    path = Path(package.cover_path)
+    if not path.exists():
+        return RedirectResponse(f"/job/writer/{package_id}", status_code=303)
+    name = f"{(package.company or 'cover').replace(' ', '-')}-Cover-Letter.docx"
+    return FileResponse(path, filename=name, media_type=(
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document"))
 
 
 # ---------------------------------------------------------------------- gap closer

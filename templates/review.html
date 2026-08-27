@@ -149,6 +149,91 @@
 </div>
 {% endif %}
 
+<!-- ---------------------------------------------------------------- cover letter -->
+<h2 id="cover">Cover letter</h2>
+{% if not cover %}
+<div class="panel">
+  <p style="margin-top: 0; font-size: 14px;">
+    Short, specific, and under the same rules as the resume: every paragraph cites your
+    facts, and anything it says about the company has to come from the posting. It will
+    not tell them you have long admired their commitment to innovation.
+  </p>
+  <form method="post" action="/job/writer/{{ package.id }}/cover">
+    <div class="actions" style="margin-top: 0;">
+      <button type="submit">Draft the letter</button>
+      <span class="hint">One model call, about fifteen seconds.</span>
+    </div>
+  </form>
+</div>
+{% else %}
+{% if cover.warnings %}
+<div class="notice warn">
+  <ul>{% for w in cover.warnings %}<li>{{ w }}</li>{% endfor %}</ul>
+</div>
+{% endif %}
+
+<div class="panel">
+  <p style="font-size: 14px; color: var(--ink); margin: 0 0 14px;">{{ cover.greeting }}</p>
+
+  <form method="post" action="/job/writer/{{ package.id }}/cover/accept">
+  {% for para in cover.paragraphs %}
+    <div class="block {{ para.grade }}">
+      <div class="block-head">
+        <span class="badge {{ para.grade }}">{{ para.grade }}</span>
+        {% if para.grade in ('inferred', 'stretch') %}
+        <label class="accept">
+          <input type="checkbox" name="para" value="{{ loop.index0 }}"
+                 {% if para.accepted %}checked{% endif %}>
+          use this
+        </label>
+        {% endif %}
+      </div>
+      <div class="block-text">{{ para.text }}</div>
+      <div class="block-meta">
+        {% if para.fact_ids %}cites #{{ para.fact_ids | join(', #') }}
+        {% else %}cites nothing{% endif %}
+      </div>
+    </div>
+  {% endfor %}
+
+  <p style="font-size: 14px; color: var(--ink); margin: 14px 0 0;">
+    {{ cover.sign_off }}<br>{{ package.title and '' }}
+  </p>
+
+    <div class="actions">
+      <button type="submit" name="action" value="save" class="secondary">Save choices</button>
+      <button type="submit" name="action" value="build">Save and build the letter</button>
+      <span class="hint">{{ cover.word_count }} words as ticked, {{ cover.draft_word_count }} if you take it all.</span>
+    </div>
+  </form>
+
+  {% if package.cover_path %}
+  <div class="actions" style="border-top: 1px solid var(--line); padding-top: 14px;">
+    <a class="button" href="/job/writer/{{ package.id }}/cover/download">Download the letter</a>
+  </div>
+  {% endif %}
+</div>
+
+{% if cover.rejected %}
+<div class="panel tight">
+  <h3 style="margin-top: 0;">Refused before you saw them</h3>
+  {% for para, why in cover.rejected %}
+    <div class="block blocked">
+      <div class="block-head"><span class="badge blocked">{{ why }}</span></div>
+      <div class="block-text">{{ para.text }}</div>
+    </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<form method="post" action="/job/writer/{{ package.id }}/cover">
+  <div class="actions">
+    <button type="submit" class="secondary">Draft it again</button>
+    <span class="hint">Discards the current draft and writes a new one.</span>
+  </div>
+</form>
+{% endif %}
+
 <!-- ------------------------------------------------------------------ gap closer -->
 <h2 id="gaps">Close the gaps</h2>
 {% if not placement.suggestions %}
