@@ -17,6 +17,54 @@
 </div>
 {% endif %}
 
+<!-- ------------------------------------------------------------------- fit score -->
+{% if fit %}
+<div class="panel fit-{{ fit.band }}">
+  <div class="fit-top">
+    <div class="fit-dial fit-{{ fit.band }}">
+      <div class="fit-n">{{ fit.score }}</div>
+      <div class="fit-of">out of 100</div>
+    </div>
+    <div style="flex: 1; min-width: 240px;">
+      <h3 style="margin: 0 0 4px; font-size: 15px;">{{ fit.headline }}</h3>
+      <p class="hint" style="margin: 0;">
+        Counted from your record and this posting. No model decides this number, so it
+        does not change unless something real does.
+      </p>
+      {% for line in fit.advice %}
+        <p style="font-size: 14px; margin: 8px 0 0; color: var(--ink);">{{ line }}</p>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div style="margin-top: 16px;">
+    {% for c in fit.components %}
+      <div class="funnel-row">
+        <div class="name" style="width: 210px;">
+          {{ c.name }}
+          <span class="hint" style="display: block; font-size: 11px;">{{ c.detail }}</span>
+        </div>
+        <div class="track">
+          {% if c.ceiling %}
+            <div class="fill {{ 'bad' if not c.good }}" style="width: {{ c.percent }}%"></div>
+          {% else %}
+            <div class="fill bad" style="width: 100%"></div>
+          {% endif %}
+        </div>
+        <div class="n">{% if c.ceiling %}{{ c.points }}<span class="hint">/{{ c.ceiling }}</span>{% else %}{{ c.points }}{% endif %}</div>
+      </div>
+    {% endfor %}
+  </div>
+
+  <form method="post" action="/job/writer/{{ package.id }}/rewrite">
+    <div class="actions">
+      <button type="submit" class="secondary">Write it again with my current facts</button>
+      <span class="hint">Same posting, same keywords. Only your record changes.</span>
+    </div>
+  </form>
+</div>
+{% endif %}
+
 <!-- ------------------------------------------------------------ what it asked for -->
 <h2>What the job asked for</h2>
 <div class="panel">

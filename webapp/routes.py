@@ -11,6 +11,7 @@ because a second caller would then have no protection at all.
 """
 from __future__ import annotations
 
+import hashlib
 import logging
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -23,7 +24,7 @@ from sqlalchemy.orm import Session
 from config import config
 from database.db import get_db
 from database.models import GeneratedBlock, Package, ProfileFact
-from modules import gaps, tracker
+from modules import fit, gaps, tracker
 from modules import contact as contact_module
 from modules.ats import AtsBlocked, check as ats_check
 from modules.extract import Extraction, NotAJobDescription, extract
@@ -163,8 +164,21 @@ def analyse(request: Request, db: Session = Depends(get_db),
                       packages=db.query(Package).order_by(
                           Package.created_at.desc()).limit(12).all())
 
+    # The same posting must give the same keywords every time. Without this, closing a
+    # gap and analysing again could move the score for reasons that have nothing to do
+    # with the gap: extract names a slightly different candidate set on each call, so the
+    # denominator would shift underneath him and a real improvement could read as a drop.
+    jd_hash = hashlib.sha256(text.encode("utf-8")).hexdigest()
+    seen = (db.query(Package)
+            .filter(Package.jd_hash == jd_hash, Package.extraction.isnot(None))
+            .order_by(Package.created_at.desc()).first())
+
     try:
-        extraction = extract(text)
+        if seen and seen.extraction:
+            extraction = Extraction.from_dict(seen.extraction)
+            log.info("reusing the extraction from package %d, same posting", seen.id)
+        else:
+            extraction = extract(text)
     except (NotAJobDescription, LLMError, RuntimeError) as exc:
         return render(request, "writer.html", section="writer", url=url, job_text=text,
                       error=f"Could not read that as a job description: {exc}",
@@ -190,10 +204,12 @@ def analyse(request: Request, db: Session = Depends(get_db),
 
     package = Package(
         job_text=text,
+        jd_hash=jd_hash,
         company=extraction.company,
         title=extraction.title,
         extraction=extraction.as_dict(),
         placement=(result.placement.as_dict() if result.placement else {}),
+        fit=_score_fit(db, extraction, result.placement, None),
         status="draft",
     )
     db.add(package)
@@ -216,6 +232,19 @@ def analyse(request: Request, db: Session = Depends(get_db),
     db.commit()
     log.info("package %d: %s", package.id, result.summary_line())
     return RedirectResponse(f"/job/writer/{package.id}", status_code=303)
+
+
+def _score_fit(db: Session, extraction, placement, ats_report) -> dict:
+    """One place computes the score, so no two screens can disagree about it."""
+    facts = db.query(ProfileFact).order_by(ProfileFact.order_index).all()
+    contact_module.bootstrap(db)
+    home = next((d.value for d in contact_module.all_details(db)
+                 if d.kind == "location"), "")
+    try:
+        return fit.assess(extraction, placement, facts, ats_report, location=home).as_dict()
+    except Exception as exc:  # noqa: BLE001 - a score must never lose the package
+        log.warning("fit scoring failed: %s", exc)
+        return {}
 
 
 def _package_view(request: Request, db: Session, package: Package,
@@ -242,6 +271,7 @@ def _package_view(request: Request, db: Session, package: Package,
     contact_module.bootstrap(db)
     return render(request, "review.html", section="writer", _db=db,
                   placement=package.placement or {},
+                  fit=package.fit or {},
                   fact_count=len(fact_rows),
                   orgs=gaps.roles(fact_rows),
                   package=package, extraction=extraction,
@@ -355,6 +385,8 @@ def _build(request: Request, db: Session, package: Package):
 
     package.resume_path = str(path)
     package.status = "ready" if report.passed else "draft"
+    # rescored now that a real document exists to judge
+    package.fit = _score_fit(db, extraction, package.placement or {}, report)
     db.commit()
 
     message = ""
@@ -388,6 +420,61 @@ def download(package_id: int, db: Session = Depends(get_db)):
     name = f"{(package.company or 'resume').replace(' ', '-')}-Sameer-Iyer.docx"
     return FileResponse(path, filename=name, media_type=(
         "application/vnd.openxmlformats-officedocument.wordprocessingml.document"))
+
+
+@router.post("/job/writer/{package_id}/rewrite")
+def rewrite(request: Request, package_id: int, db: Session = Depends(get_db)):
+    """Write it again against the same posting, using whatever the record says now.
+
+    The point of closing a gap is seeing it count. That only works if the posting is
+    held still: the stored extraction is reused rather than re-derived, so any movement
+    in the score is movement in the record and not the model picking different words.
+    """
+    package = db.get(Package, package_id)
+    if package is None or not package.extraction:
+        return RedirectResponse("/job/writer", status_code=303)
+
+    extraction = Extraction.from_dict(package.extraction)
+    facts = db.query(ProfileFact).order_by(ProfileFact.order_index).all()
+    before = (package.fit or {}).get("score")
+
+    try:
+        result = tailor(extraction, facts)
+    except (LLMError, RuntimeError) as exc:
+        return _package_view(request, db, package, error=str(exc),
+                             error_title="Could not write it again")
+
+    db.query(GeneratedBlock).filter(GeneratedBlock.package_id == package.id).delete()
+    for index, block in enumerate(result.blocks):
+        db.add(GeneratedBlock(
+            package_id=package.id, section=block.section, org=block.org,
+            text=block.text, fact_ids=block.fact_ids, grade=block.grade,
+            rationale=block.rationale, accepted=block.accepted,
+            order_index=block.order_index if block.order_index is not None else index,
+        ))
+    for block, why in result.rejected:
+        db.add(GeneratedBlock(
+            package_id=package.id, section=block.section, org=block.org,
+            text=block.text, fact_ids=block.fact_ids, grade="blocked",
+            rationale=why, accepted=False, order_index=999,
+        ))
+
+    kept = (package.placement or {}).get("suggestions")
+    package.placement = result.placement.as_dict() if result.placement else {}
+    if kept:
+        package.placement["suggestions"] = kept
+    package.fit = _score_fit(db, extraction, result.placement, None)
+    _invalidate(package)
+    db.commit()
+
+    after = (package.fit or {}).get("score")
+    moved = ""
+    if before is not None and after is not None:
+        delta = after - before
+        moved = (f" Fit moved {before} to {after}." if delta
+                 else f" Fit unchanged at {after}.")
+    return _package_view(request, db, package,
+                         message=f"Written again against the same posting.{moved}")
 
 
 # ---------------------------------------------------------------------- gap closer

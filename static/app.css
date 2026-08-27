@@ -318,3 +318,25 @@ select {
   font: inherit; font-size: 13px; padding: 6px 9px; border-radius: 6px;
   border: 1px solid var(--line); background: var(--panel); color: var(--ink);
 }
+
+/* ------------------------------------------------------------------ fit score */
+
+.panel.fit-green { border-left: 3px solid var(--accent); }
+.panel.fit-amber { border-left: 3px solid var(--amber); }
+.panel.fit-red   { border-left: 3px solid var(--red); }
+
+.fit-top { display: flex; gap: 22px; align-items: center; flex-wrap: wrap; }
+.fit-dial {
+  width: 104px; height: 104px; border-radius: 50%;
+  display: grid; place-content: center; text-align: center; flex: none;
+  border: 5px solid var(--line);
+}
+.fit-dial.fit-green { border-color: var(--accent); background: var(--accent-soft); }
+.fit-dial.fit-amber { border-color: var(--amber); background: var(--amber-soft); }
+.fit-dial.fit-red   { border-color: var(--red); background: var(--red-soft); }
+.fit-n { font-size: 32px; font-weight: 650; letter-spacing: -0.03em; line-height: 1; }
+.fit-green .fit-n { color: var(--accent); }
+.fit-amber .fit-n { color: var(--amber); }
+.fit-red .fit-n   { color: var(--red); }
+.fit-of { font-size: 10px; color: var(--muted); margin-top: 3px; letter-spacing: 0.04em; }
+.funnel-row .fill.bad { background: var(--red); }

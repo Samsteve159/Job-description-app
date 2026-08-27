@@ -128,6 +128,10 @@ class Package(Base):
     find_id = Column(Integer, ForeignKey("finds.id"), nullable=True)
     # a pasted JD has no Find, so the raw text lives here
     job_text = Column(Text, nullable=False)
+    # sha256 of the posting text. Analysing the same job twice must not produce a
+    # different keyword set, or closing a gap and rebuilding could move the score for
+    # reasons that have nothing to do with the gap being closed
+    jd_hash = Column(String(64), nullable=True, index=True)
     company = Column(String(256), nullable=True)
     title = Column(String(256), nullable=True)
     # the whole Extraction, so reopening a package costs no model call
@@ -136,6 +140,8 @@ class Package(Base):
     # genuine gap. Stored because it is the most useful thing on the review screen and
     # recomputing it would mean re-running the stage that produced the text
     placement = Column(JSON, default=dict)
+    # the fit score and the components behind it, so the number can always be argued with
+    fit = Column(JSON, default=dict)
     resume_path = Column(Text, nullable=True)
     cover_path = Column(Text, nullable=True)
     screening = Column(JSON, default=dict)

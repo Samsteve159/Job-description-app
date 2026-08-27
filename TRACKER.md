@@ -25,7 +25,6 @@ running `scripts/probe_models.py` against the live key, not from a published lis
 | `extract` | `openai/gpt-oss-120b` | Sets the candidate terms every later stage is measured against |
 | `tailor` | `openai/gpt-oss-120b` | 3.2s. Fastest model that held the citation shape on the hard task |
 | `cover` | `openai/gpt-oss-120b` | Prose quality still untested. Bake off before trusting it |
-| `screening` | `openai/gpt-oss-20b` | Short answers |
 | `brief` | `openai/gpt-oss-20b` | Question generation from a JD |
 | `gaps` | `openai/gpt-oss-120b` | Structured JSON with a judgement in it. The 20b model returned empty responses |
 | fallback | `anthropic:claude-sonnet-5` | **Paid.** Fires only on a NIM failure. Logged at WARNING with the word PAID |
@@ -55,9 +54,10 @@ find-and-copy work, so it becomes plain Python when the adapters land.
 | 3 | App shell: modules, dashboard, tracker, `run.command` | **done. It opens in a browser** |
 | 4 | Scout adapters and Scout Finds | blocked on Adzuna / RapidAPI keys |
 | 5 | VM worker and sync | blocked on SSH + tunnel hostname |
-| 6 | Cover letter and screening answers | not started |
+| 6 | Cover letter | not started |
 | 7 | Interview Brief | not started |
 | 8 | Gmail application scan | **blocked on a Google Cloud OAuth client** |
+| 10 | Fit score, 1 to 100, red/amber/green | **done** |
 | 9 | Post Writer module | blocked on a port-or-rebuild decision |
 
 ## Running it
@@ -203,13 +203,14 @@ unevidenced. It asks a question, and what he types becomes the evidence.
 tests/test_ats.py        29      the ATS gate against real rejection modes
 tests/test_contact.py    23      contact details, and surviving a re-seed
 tests/test_fetch_jd.py   30      refusing login walls and bot checks
+tests/test_fit.py        32      every way a fit score flatters the person reading it
 tests/test_guards.py     34      citations, numbers, tenure, headcount, the render gate
 tests/test_gaps.py       28      adjacency, refusing to ask, writing back to the JSON
 tests/test_keywords.py   77      placement, the head-noun test, emphasis, unsupported claims
 tests/test_tracker.py    28      counting, the high-water mark, silence
 tests/test_webapp.py     46      every screen, and that a screen cannot skip a gate
                         ---
-                        295 passing
+                        327 passing
 ```
 
 The webapp suite's most important case: accept a reaching block, build, untick it, and
@@ -275,6 +276,10 @@ Full rationale in `DECISIONS.md`. The ones most likely to be re-litigated:
   weights, claims adjacent skills with evidence. Per-job tweaking is the product
 - **`STRICT_NUMBERS` is a flag, default on.** Blocks figures not present in cited facts.
   Only fires on invented numbers. Set false in `.env` to disable
+- **No screening answer bank.** Dropped 27 Aug at Sameer's request. Notice period,
+  expected CTC and why-India stay as facts he can cite; the app does not maintain a
+  tailored answer for each. Cover letters were the other half of that slice and stay,
+  since the section is called Resume and Cover
 - **Interview Brief does three things only**: likely questions, company details, what to ask
   them. No story matching, no resume tie-in. That is why it stays standalone
 - **Free primaries, paid fallback.** Every stage runs on NIM. Claude catches failures and
@@ -290,6 +295,7 @@ Full rationale in `DECISIONS.md`. The ones most likely to be re-litigated:
 | Date | What happened |
 |---|---|
 | 25 Aug 2026 | Backbone built. `extract` and `tailor` written, 20 guard tests passing. Model routing researched and corrected against the live catalogue. Moved into the project root. Paused |
+| 27 Aug 2026 | Fit score built: 1 to 100, red/amber/green, weighted by what the posting leans on and counted against the facts rather than the draft. Same posting now reuses its extraction, so closing a gap and rewriting cannot move the score for the wrong reason. Screening answers dropped. Tests 295 to 327 |
 | 26 Aug 2026 (night) | Gap closer built: asks about work the record does not cover, writes his answers back to the JSON. `extract` stopped deciding its own denominator. minimax-m3 dropped from every route, rate limited to 0 of 4. Tests 246 to 295 |
 | 26 Aug 2026 (evening) | Deterministic keyword placement. Spread went from 44% to 0%, and the fix uncovered that high coverage had been measuring fabrication. New guard for skill claims no fact supports. Tests 184 to 246 |
 | 26 Aug 2026 (later) | App shell: two modules, dashboard, tracker, modal errors, light and dark. `fetch_jd` done. Bake-off run, which found the variance is prompt-side not model-side. Tests 63 to 184 |

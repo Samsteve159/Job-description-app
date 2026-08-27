@@ -31,6 +31,7 @@ is the trade this app exists to refuse.
 from __future__ import annotations
 
 import logging
+import math
 import re
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Sequence, Set, Tuple
@@ -122,9 +123,52 @@ def unsupported(text: str, wanted: Sequence[str], facts: Sequence[Any]) -> List[
             continue
         wants = significant(term)
         present = term.lower() in lowered or (wants and " ".join(wants) in joined)
-        if present and find_evidence(term, facts) is None:
+        if present and find_evidence(term, facts) is None and not _distinctive_hit(term, facts):
             out.append(term)
     return out
+
+
+# Generic on their own. "unspsc taxonomy" is carried entirely by "unspsc"; "taxonomy"
+# could belong to anything. Used only to decide whether a claim is a fabrication, never
+# to decide whether a keyword may be placed.
+# Compared in canonical form, not as written. Spelled plainly and matched against
+# significant() output, "taxonomy" never matched anything, because significant() had
+# already turned it into "taxonomies". A lookup table has to be keyed the same way as the
+# thing looking things up in it. Canonicalised on use rather than at import, because
+# canonical() is defined below this point and import order is a silly thing to depend on.
+_GENERIC_WORDS = (
+    "taxonomy", "management", "analysis", "data", "process", "framework", "system",
+    "systems", "tool", "tools", "platform", "platforms", "discipline", "practice",
+    "practices", "work", "activity", "activities", "operations", "function", "team",
+)
+
+
+def _is_generic(word: str) -> bool:
+    return word in {canonical(w) for w in _GENERIC_WORDS}
+
+
+def _distinctive_hit(term: str, facts: Sequence[Any]) -> bool:
+    """Does the rare half of a phrase appear in the record?
+
+    `find_evidence` needs every significant word in one fact before it will place a
+    keyword, which is the right bar for putting words on a page. It is the wrong bar for
+    accusing the writing of making something up. "unspsc taxonomy" against a fact reading
+    "audits supplier categorisation against UNSPSC" has no "taxonomy" in it and was being
+    reported as unsupported, which is a false accusation about a real skill.
+
+    So flagging a fabrication requires the distinctive part to be missing too.
+    """
+    distinctive = [w for w in significant(term)
+                   if not _is_generic(w) and len(w) >= 4]
+    if not distinctive:
+        return False
+    for fact in facts:
+        if not getattr(fact, "verified", True):
+            continue
+        fact_tokens = set(tokens(_fact_text(fact)))
+        if all(w in fact_tokens for w in distinctive):
+            return True
+    return False
 
 
 @dataclass
@@ -508,3 +552,36 @@ def split_by_emphasis(jd_text: str, candidates: Sequence[str],
 # that UNSPSC is a taxonomy and "such" is not. The model's domain sense is doing real
 # work in naming candidates; what it could not be trusted with was deciding which of them
 # the job insists on, and split_by_emphasis takes that job away from it.
+
+
+# A term in the job title is not one requirement among many, it is what the job is.
+TITLE_MULTIPLIER = 4.0
+
+
+def weights(jd_text: str, title: str, terms: Sequence[str]) -> Dict[str, float]:
+    """How much each term matters to this posting, from where and how often it appears.
+
+    Counting must-have coverage as a flat fraction treats every term as equal, and they
+    are not. The Wells Fargo posting is titled "Lead Treasury Analyst, Product Owner - AI"
+    and lists "capital", "funding" and "liquidity" once each in a sentence. Scored flat,
+    having eight of twelve looked like a good fit at 72 out of 100, when the four missing
+    were product owner, agile, backlog and risk management: the entire product half of a
+    product role. Weighting says what a person reading the posting would say, which is
+    that the title terms are the job and the rest is context.
+    """
+    required, _ = _sections(jd_text)
+    lowered_title = " ".join(tokens(title or ""))
+    out: Dict[str, float] = {}
+    for term in terms:
+        wanted = significant(term)
+        if not wanted:
+            continue
+        # Damped, because repetition is evidence of emphasis and not a linear measure of
+        # it. "ai" appears twenty-one times in the Wells Fargo posting and "funding"
+        # twice; undamped that made ai thirty times the term, which is not what a person
+        # reading it would say. The square root keeps the ordering and loses the tyranny.
+        weight = 1.0 + math.sqrt(_mentions(term, required))
+        if lowered_title and " ".join(wanted) in lowered_title:
+            weight *= TITLE_MULTIPLIER
+        out[term] = weight
+    return out

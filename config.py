@@ -44,7 +44,6 @@ STAGES = (
     "extract",     # JD -> structured requirements
     "tailor",      # ProfileFact + requirements -> resume blocks
     "cover",       # cover letter
-    "screening",   # screening answer bank
     "brief",       # interview brief (Section 3, standalone)
     "gaps",        # asks him about work the record does not cover
 )
@@ -76,7 +75,6 @@ STAGE_DEFAULTS = {
     "extract": NIM_MAIN,      # sets the keywords every later stage is measured against
     "tailor": NIM_MAIN,       # fastest model that held the citation shape on the hard task
     "cover": NIM_MAIN,        # prose is untested by the probe. Bake-off before trusting it
-    "screening": NIM_FAST,
     "brief": NIM_FAST,
     # Writes a question rather than a claim, which sounded like the easy half of the job.
     # It is not: the output is structured JSON with a judgement call in it, and gpt-oss-20b
