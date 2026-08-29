@@ -98,7 +98,6 @@ with TestClient(app) as client:
     for path, marker in [
         ("/job/writer", "Resume &amp; Cover Writer"),
         ("/job/details", "My Details"),
-        ("/job/finds", "Scout Finds"),
         ("/job/brief", "Interview Brief"),
     ]:
         r = client.get(path)

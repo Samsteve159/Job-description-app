@@ -2,8 +2,8 @@
 
 Two families of tables that must never touch each other:
 
-  Sections 1 and 2 (Scout Finds, Resume & Cover Writer)
-      ContactDetail, ProfileFact, Find, Requirement, Package, GeneratedBlock,
+  Sections 1 and 2 (Resume & Cover Writer, and the application tracker)
+      ContactDetail, ProfileFact, Requirement, Package, GeneratedBlock,
       Application
 
   Section 3 (Interview Brief) -- fully standalone
@@ -81,38 +81,12 @@ class ProfileFact(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
 
-# ------------------------------------------------------------------ section 1: finds
-
-class Find(Base):
-    """A scouted job. Written by the local scout and by the VM worker pull."""
-    __tablename__ = "finds"
-
-    id = Column(Integer, primary_key=True)
-    source = Column(String(32), nullable=False)          # adzuna | jsearch | jooble
-    external_id = Column(String(256), nullable=True)
-    dedupe_key = Column(String(64), nullable=False, index=True)
-    company = Column(String(256), nullable=True)
-    title = Column(String(256), nullable=False)
-    location = Column(String(256), nullable=True)
-    url = Column(Text, nullable=False)
-    description = Column(Text, nullable=True)
-    brief = Column(Text, nullable=True)                  # why this is a fit, 2-3 lines
-    fit_score = Column(Float, nullable=True)             # 0-100
-    gaps = Column(JSON, default=list)
-    posted_at = Column(DateTime, nullable=True)
-    origin = Column(String(8), default="local")          # local | vm
-    # new | shortlisted | dismissed
-    status = Column(String(16), default="new", index=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
-
-
 # ----------------------------------------------------------------- section 2: writer
 
 class Requirement(Base):
     __tablename__ = "requirements"
 
     id = Column(Integer, primary_key=True)
-    find_id = Column(Integer, ForeignKey("finds.id"), nullable=True)
     package_id = Column(Integer, ForeignKey("packages.id"), nullable=True)
     kind = Column(String(8), default="must")             # must | nice
     text = Column(Text, nullable=False)
@@ -125,8 +99,7 @@ class Package(Base):
     __tablename__ = "packages"
 
     id = Column(Integer, primary_key=True)
-    find_id = Column(Integer, ForeignKey("finds.id"), nullable=True)
-    # a pasted JD has no Find, so the raw text lives here
+    # the posting itself, pasted or fetched from a URL. Always the source
     job_text = Column(Text, nullable=False)
     # sha256 of the posting text. Analysing the same job twice must not produce a
     # different keyword set, or closing a gap and rebuilding could move the score for
@@ -199,7 +172,6 @@ class Application(Base):
 
     id = Column(Integer, primary_key=True)
     package_id = Column(Integer, ForeignKey("packages.id"), nullable=True)
-    find_id = Column(Integer, ForeignKey("finds.id"), nullable=True)
 
     company = Column(String(256), nullable=True)
     title = Column(String(256), nullable=True)

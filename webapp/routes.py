@@ -697,21 +697,6 @@ def details_visibility(request: Request, db: Session = Depends(get_db),
 
 # ------------------------------------------------------------- not built yet
 
-@router.get("/job/finds")
-def finds(request: Request):
-    return render(request, "not_built.html", section="finds",
-                  heading="Scout Finds",
-                  why="This is where jobs found while your Mac was off will land, with a "
-                      "fit score and a reason, and a button to hand one straight to the "
-                      "writer. The adapters are not built yet.",
-                  blocked_on=[
-                      "An Adzuna app id and key, free tier, good India coverage",
-                      "A RapidAPI key for JSearch, which aggregates the big boards "
-                      "without scraping any of them",
-                      "For the always-on half: SSH to the VM and a spare tunnel hostname",
-                  ])
-
-
 @router.get("/job/brief")
 def brief(request: Request):
     return render(request, "not_built.html", section="brief",

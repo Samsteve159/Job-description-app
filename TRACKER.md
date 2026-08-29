@@ -2,9 +2,9 @@
 
 Status for the Job App. Start here.
 
-**Updated 26 Aug 2026.** The writer pipeline has now run live, end to end, against a real
-job description. Two defects it exposed are fixed. The web app is not built, so there is no
-local link yet.
+**Updated 29 Aug 2026.** The app runs at `http://127.0.0.1:8100` via `./run.command`. The
+writer pipeline, both gates, the fit score, keyword placement, cover letters and the tracker
+are built and tested. Job scouting was dropped; the app starts at a posting you give it.
 
 Scope note: this directory is the whole project. It does not read from, write to, or depend
 on anything outside `Job_App/`. The LinkedIn profile work is finished and lives elsewhere.
@@ -21,7 +21,6 @@ running `scripts/probe_models.py` against the live key, not from a published lis
 
 | Stage | Model | Why |
 |---|---|---|
-| `score` | `openai/gpt-oss-20b` | Highest volume, and about a second a call |
 | `extract` | `openai/gpt-oss-120b` | Sets the candidate terms every later stage is measured against |
 | `tailor` | `openai/gpt-oss-120b` | 3.2s. Fastest model that held the citation shape on the hard task |
 | `cover` | `openai/gpt-oss-120b` | Prose quality still untested. Bake off before trusting it |
@@ -39,9 +38,6 @@ benchmark scores. `modules/llm.py` now backs off on a 429 rather than falling st
 through to the paid fallback, because a rate limit is a "not yet", not a "no", and paying
 Claude for one is a free stack quietly becoming a billed one.
 
-`normalise` is not a stage. Mapping a job board's JSON onto our `Find` record is
-find-and-copy work, so it becomes plain Python when the adapters land.
-
 ---
 
 ## Slices
@@ -52,8 +48,8 @@ find-and-copy work, so it becomes plain Python when the adapters land.
 | 1 | Writer core: `extract`, `tailor`, truth guards, ATS gate | done, run live |
 | 2 | `fetch_jd`: job URL to clean JD text | **done, run against real postings** |
 | 3 | App shell: modules, dashboard, tracker, `run.command` | **done. It opens in a browser** |
-| 4 | Scout adapters and Scout Finds | blocked on Adzuna / RapidAPI keys |
-| 5 | VM worker and sync | blocked on SSH + tunnel hostname |
+| 4 | Scout adapters and Scout Finds | **dropped, 29 Aug 2026** |
+| 5 | VM worker and sync | **dropped with slice 4** |
 | 6 | Cover letter | **done** |
 | 7 | Interview Brief | not started |
 | 8 | Gmail application scan | **blocked on a Google Cloud OAuth client** |
@@ -279,8 +275,6 @@ The second run said "10 years of experience". Computed figure is 9.8.
 | | Blocks |
 |---|---|
 | **Google Cloud project + OAuth client for Gmail** | Counting applications automatically. Only he can create it |
-| Adzuna app id + key, RapidAPI key (both free tier) | Scout Finds |
-| SSH access + spare tunnel hostname | The always-on VM worker |
 | Port the existing Post Writer in, or rebuild it here | Module two |
 
 ### Three unverified facts
@@ -312,7 +306,10 @@ Full rationale in `DECISIONS.md`. The ones most likely to be re-litigated:
 - **Free primaries, paid fallback.** Every stage runs on NIM. Claude catches failures and
   announces itself in the log when it does
 - **No auto-apply.** Nothing is submitted without you reading it
-- **APIs only, no scraping.** LinkedIn returns HTTP 999 to automation
+- **No job scouting.** Dropped 29 Aug. Job APIs do not cover the boards India actually
+  hires on, and he finds postings himself in seconds. The app starts at the posting
+- **No scraping.** LinkedIn returns HTTP 999 to automation, and `fetch_jd` asks for a paste
+  rather than tailoring against page furniture
 - **No agents.** Every stage is a single call
 
 ---
@@ -321,6 +318,7 @@ Full rationale in `DECISIONS.md`. The ones most likely to be re-litigated:
 
 | Date | What happened |
 |---|---|
+| 29 Aug 2026 | Scout Finds and the VM worker dropped. Job APIs do not reach LinkedIn or Naukri, and he already finds postings himself. Removed the `Find` table, three dead foreign keys, the unused `score` LLM stage and five environment variables. Two build slices gone, nothing working lost. Tests 446 to 445 |
 | 25 Aug 2026 | Backbone built. `extract` and `tailor` written, 20 guard tests passing. Model routing researched and corrected against the live catalogue. Moved into the project root. Paused |
 | 27 Aug 2026 (later) | Cover letters. Analyse screen split into two paths with skeletons and instant host warnings. Tests 341 to 446 |
 | 27 Aug 2026 | Fit score built: 1 to 100, red/amber/green, weighted by what the posting leans on and counted against the facts rather than the draft. Same posting now reuses its extraction, so closing a gap and rewriting cannot move the score for the wrong reason. Screening answers dropped. Tests 295 to 327 |

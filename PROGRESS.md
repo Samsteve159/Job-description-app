@@ -43,8 +43,6 @@ seed_profile: 58 facts (4 roles, 20 bullets, 23 skills,
 3. `scripts/bakeoff.py` — same JD through NIM and Claude, side by side
 4. `main.py` and `webapp/` — local server, three-section nav, Writer wired in
 5. `run.command` — double-clickable launcher
-6. Scout adapters (Adzuna, JSearch) and Scout Finds
-7. VM worker and sync
 8. Cover letter, screening answers
 9. Interview Brief
 
@@ -52,7 +50,6 @@ seed_profile: 58 facts (4 roles, 20 bullets, 23 skills,
 
 - **NIM API key** (build.nvidia.com) into `.env` as `NIM_API_KEY`. Every guard and the
   renderer work without it. `extract` and `tailor` are written but unrun
-- Adzuna app id and key, RapidAPI key, for slice 5
 - Four unverified facts in `data/profile_facts.json`, excluded from citation until
   confirmed: notice period, expected CTC, reason for moving back to India, and the phone
   number, which is currently an Australian mobile

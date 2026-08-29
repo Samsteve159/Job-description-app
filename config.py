@@ -40,18 +40,12 @@ def _flag(key: str, default: bool = False) -> bool:
 # Format: "<provider>:<model>"  e.g. "nim:meta/llama-3.3-70b-instruct"
 #                                    "anthropic:claude-sonnet-5"
 STAGES = (
-    "score",       # Find vs positioning -> fit, brief, gaps
     "extract",     # JD -> structured requirements
     "tailor",      # ProfileFact + requirements -> resume blocks
     "cover",       # cover letter
     "brief",       # interview brief (Section 3, standalone)
     "gaps",        # asks him about work the record does not cover
 )
-
-# "normalise" is deliberately NOT a stage. Mapping one job board's JSON fields onto our own
-# Find record is find-and-copy work. Deterministic code does it perfectly, instantly, free,
-# and cannot invent a company name. An LLM there would be slower, cost money and add risk
-# for nothing. See modules/normalise.py when the adapters land.
 
 # Catalogue as at Aug 2026. Free NIM models can be deprecated at short notice, so
 # scripts/check_models.py validates every route before a run rather than discovering it
@@ -71,7 +65,6 @@ PAID_PROVIDERS = ("anthropic",)
 DEFAULT_CLAUDE_MODEL = "claude-sonnet-5"
 
 STAGE_DEFAULTS = {
-    "score": NIM_FAST,        # highest volume, fastest usable model
     "extract": NIM_MAIN,      # sets the keywords every later stage is measured against
     "tailor": NIM_MAIN,       # fastest model that held the citation shape on the hard task
     "cover": NIM_MAIN,        # prose is untested by the probe. Bake-off before trusting it
@@ -124,15 +117,6 @@ class Config:
         "NIM_BASE_URL", "https://integrate.api.nvidia.com/v1"
     ).strip()
     anthropic_api_key: str = ""
-
-    # job apis (slice 3+)
-    adzuna_app_id: str = os.environ.get("ADZUNA_APP_ID", "").strip()
-    adzuna_app_key: str = os.environ.get("ADZUNA_APP_KEY", "").strip()
-    rapidapi_key: str = os.environ.get("RAPIDAPI_KEY", "").strip()
-
-    # vm scout worker sync (slice 4)
-    worker_url: str = os.environ.get("WORKER_URL", "").strip()
-    worker_token: str = os.environ.get("WORKER_TOKEN", "").strip()
 
     # app
     host: str = os.environ.get("HOST", "127.0.0.1").strip()

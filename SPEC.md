@@ -3,30 +3,20 @@
 ## What this is
 
 A desktop app on Sameer's Mac for running an India job search. Career history and generated
-documents never leave the machine. The only outbound traffic is LLM APIs, job APIs, and a
-pull from the scout worker.
+documents never leave the machine. The only outbound traffic is LLM API calls and, when he
+gives it a URL, one fetch of that job posting.
 
-## Three sections
+Finding the jobs is not the app's job. He does that himself on LinkedIn and Naukri, which no
+job API reaches. The app starts at the point where he has a posting in front of him.
 
-### 1. Scout Finds
-The scout's output surface. A list, not a workflow.
+## Two sections
 
-Row: job link, short brief, fit score, gaps, source, posted date.
-Actions: shortlist (hands the JD to Section 2), dismiss, clear queue.
-
-Two writers, one table:
-- pull from the VM worker, for jobs found while the Mac was off
-- on-demand local scout, for fresh results while he is at the machine
-
-Stages: `scout` -> `normalise` -> `dedupe` -> `score`. Dedupe is deterministic, not an LLM.
-
-### 2. Resume & Cover Writer
-Three ways in, all landing on the same pipeline:
+### 1. Resume & Cover Writer
+Two ways in, both landing on the same pipeline:
 - a **job URL**, which `fetch_jd` resolves to clean JD text
 - **pasted JD text**
-- a shortlisted row handed over from Scout Finds
 
-Stages: `fetch` -> `extract` -> `tailor` -> `cover` -> `screening` -> `render` -> `ats`.
+Stages: `fetch` -> `extract` -> `tailor` -> `cover` -> `render` -> `ats`.
 
 ### The ATS gate
 
@@ -61,7 +51,7 @@ Tailoring pushes hard on framing but never past the facts. Grading:
 | Adjacent skill with evidence | stretch | amber, must be accepted |
 | Nothing | blocked | never renders |
 
-### 3. Interview Brief (standalone)
+### 2. Interview Brief (standalone)
 
 Own nav item, own form, own table. Paste a job link or JD, get three things back:
 
@@ -75,13 +65,8 @@ boundary costs nothing.
 
 ## The boundary
 
-```
-VM worker (always on)                 Mac (local app)
-  scout, normalise, dedupe, score       Scout Finds, Writer, Interview Brief
-  own unit, own DB, own hostname        ProfileFact, resumes, covers, briefs
+Everything runs on the Mac. There is no second machine, no worker, no inbound port and no
+tunnel. `main.py` binds `127.0.0.1` and warns if `HOST` is ever set to anything else, because
+that bind is the only thing standing in for a login.
 
-  up:   search criteria only
-  down: public job listings only
-```
-
-Career facts, salary expectations and generated documents never go up.
+Career facts, salary expectations and generated documents never leave the machine.

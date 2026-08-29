@@ -49,7 +49,7 @@ GHOST_AFTER_DAYS = 30
 
 def log_application(db: Any, *, company: Optional[str] = None, title: Optional[str] = None,
                     url: Optional[str] = None, source: str = "manual",
-                    package_id: Optional[int] = None, find_id: Optional[int] = None,
+                    package_id: Optional[int] = None,
                     external_ref: Optional[str] = None, notes: Optional[str] = None,
                     confidence: Optional[float] = None,
                     applied_at: Optional[datetime] = None) -> Application:
@@ -67,7 +67,7 @@ def log_application(db: Any, *, company: Optional[str] = None, title: Optional[s
         company=(company or "").strip() or None,
         title=(title or "").strip() or None,
         url=(url or "").strip() or None,
-        source=source, package_id=package_id, find_id=find_id,
+        source=source, package_id=package_id,
         external_ref=external_ref, notes=notes, confidence=confidence,
         applied_at=applied_at or datetime.utcnow(),
         status="applied",

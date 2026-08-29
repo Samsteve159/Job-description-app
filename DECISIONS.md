@@ -6,7 +6,7 @@ Recorded because "not built" and "broken" look identical from outside.
 |---|---|---|
 | Surface | Desktop, local only | Career history and salary expectations stay on the machine |
 | Users | Single user | No tenancy, no sign-up, no billing |
-| Sections | Three | Scout Finds, Writer, Interview Brief |
+| Sections | Two | Writer, Interview Brief |
 | Interview Brief | Fully standalone | Own input, own table, shares nothing. Enforced by test |
 | Job sourcing | APIs only | LinkedIn returns HTTP 999 to automation. Scraping is out |
 | Autonomy | Prepare only | Nothing auto-applies. He reads everything before it goes out |
@@ -16,7 +16,7 @@ Recorded because "not built" and "broken" look identical from outside.
 | Fabrication | Not built | Background verification is standard at his target employers |
 | Format | ATS-safe single-column docx | Built with python-docx, audited on every render |
 | Models | NIM first, per-stage override | Cost. Claude is the fallback and the bake-off comparator |
-| Always-on scout | Worker on the existing VM | A local app cannot run while the Mac is off |
+| Always-on scout | **Dropped** | He finds jobs himself on LinkedIn and Naukri, neither of which a job API reaches. See below |
 | Front end | Server-rendered Jinja2 | No bundler. One user, a handful of screens. A build step buys nothing |
 
 ## Decisions that look odd and are deliberate
@@ -59,8 +59,8 @@ broken the standalone boundary. The three-item scope is both simpler and more co
 
 **No agents. Every stage is a single call.** The original idea was agents per pipeline
 stage. Dropped, because an agent earns its place only when the model must decide its own
-next step or reach outside itself, and no stage here does. `score`, `extract`, `cover` and
-`screening` are one input and one structured output. `normalise`, `dedupe` and the guards
+next step or reach outside itself, and no stage here does. `extract`, `tailor` and `cover`
+are one input and one structured output. Keyword placement, the fit score and the guards
 are deterministic code. A loop would add cost and failure modes for nothing.
 
 Worth recording for whoever revisits this: all four NIM models tested do support tool
@@ -68,11 +68,32 @@ calling, so agents are technically possible on the free tier. That was verified,
 assumed. The reason not to build them is that they are unnecessary, not that they are
 unavailable.
 
+**Scout Finds and the VM worker are dropped.** 29 Aug 2026. They were slices 4 and 5, and
+the plan had a whole second machine behind them: a systemd unit on the VM that already runs
+a live client system, its own database, its own tunnel hostname, a bearer-token sync
+endpoint, and a privacy boundary to enforce and test because career facts would have been
+on one side of it and a network call on the other.
+
+All of that bought automatic job discovery. Which is the one part of the search Sameer was
+already doing, in about thirty seconds, on LinkedIn.
+
+The India market runs on LinkedIn and Naukri. Adzuna's Indian index is thin, and JSearch's
+free tier is a few hundred calls a month, which does not survive daily polling across five
+cities and several titles. So the realistic outcome was a partial, stale feed sitting next
+to the full one he reads anyway, plus two free API keys, plus SSH access, plus a second
+deployment to keep alive.
+
+The app's value is in the half that is hard: reframing a real record against a posting
+without inventing anything, proving every line, and getting the file through the filter.
+Finding the posting is not hard. Dropping the scout removed `Find`, three dead foreign
+keys, the `score` LLM stage, five environment variables and two build slices, and cost
+nothing that was working.
+
+What replaces it: he pastes a URL or the text. Which is what he was doing regardless.
+
 ## Not built
 
 - Fabricated experience of any kind
-- Gap closer (honest answers for genuine gaps, plus a learn-next list). Gap data already
-  exists in scoring, so this is a small addition when wanted
-- Application tracker. `Find.status` covers shortlist and dismiss only
+- Job scouting, job-board APIs, and the always-on VM worker. See above
 - Auto-apply, scraping, multi-user
-- Any coupling between Interview Brief and Sections 1 or 2
+- Any coupling between Interview Brief and the writer

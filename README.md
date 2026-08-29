@@ -5,8 +5,9 @@ tailored, ATS-safe resume where **every line traces back to something you actual
 
 Runs on your own machine. Your career history and generated documents never leave it.
 
-> Status: in build. The writer pipeline and both gates are implemented and tested. The web
-> UI, job scouting and interview brief are not built yet. See `TRACKER.md`.
+> Status: in build. The writer pipeline, both gates, the fit score, the tracker and the
+> web UI are implemented and tested. The interview brief is not built yet. Job scouting
+> was dropped on purpose. See `TRACKER.md`.
 
 ## Why this exists
 
@@ -120,7 +121,8 @@ on failure.
 
 - Invent experience. Every claim traces to a fact you entered
 - Apply on your behalf. It prepares, you submit
-- Scrape job boards. Official APIs only
+- Find jobs for you. You bring the posting, as a URL or as pasted text
+- Scrape anything
 
 ## Layout
 

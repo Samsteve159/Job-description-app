@@ -41,8 +41,8 @@ lists the files.
 
 **This directory is the whole project.** Do not read from, write to, or reference anything
 outside `Job_App/`. If the app needs a fact about Sameer it goes in `data/profile_facts.json`.
-If it needs search criteria they go in `data/search_criteria.json`. Both are this project's
-own copies, on purpose, so nothing here depends on work that lives elsewhere.
+That file is this project's own copy, on purpose, so nothing here depends on work that
+lives elsewhere.
 
 ## Hard rules
 
@@ -62,8 +62,9 @@ own copies, on purpose, so nothing here depends on work that lives elsewhere.
    dead on contact, and several models the account's own /models endpoint lists return 404
    when invoked. Pick with `scripts/probe_models.py`, confirm with `scripts/check_models.py`,
    and record what you found. Listing is not the same as callable.
-6. **The VM already runs a live client system.** Never modify its existing unit. The scout worker
-   gets its own directory, systemd unit, database and tunnel hostname.
+6. **There is no scout and no VM worker.** Jobs arrive as a pasted JD or a URL, nothing else.
+   Do not add job-board adapters or a second machine without asking. Dropped 29 Aug 2026;
+   the reasoning is in `DECISIONS.md`.
 
 ## Environment
 
@@ -101,7 +102,6 @@ modules/tailor.py      facts + requirements to graded blocks, then to_payload()
 modules/render_docx.py the truth gate, ATS-safe writer, and audit()
 modules/ats.py         the ATS gate. simulate_parse(), check(), gate()
 data/profile_facts.json  the career source of truth. Hand-edit, then re-seed
-data/search_criteria.json what the scout looks for and how fit is scored
 scripts/seed_profile.py  loads that JSON into ProfileFact
 scripts/check_models.py  verify routes resolve. --list shows what the key can reach
 scripts/probe_models.py  rank candidate models on real work. --task extract|tailor
