@@ -37,6 +37,7 @@ def ok(label, condition, detail=""):
 def build(name="Jane Doe", contact=None, roles=None, **kw) -> Path:
     payload = ResumePayload(
         name=name,
+        headline=kw.get("headline", ""),
         contact=contact if contact is not None else ["jane.doe@example.com", "Mumbai, India"],
         summary=kw.get("summary", "Spend analysis, SQL and UNSPSC categorisation."),
         skills=kw.get("skills", ["Spend Analysis", "SQL", "UNSPSC"]),
@@ -106,6 +107,52 @@ ok("dirty characters do not reach the page",
    all(ord(c) < 128 for c in rendered),
    [f"U+{ord(c):04X}" for c in rendered if ord(c) > 127])
 ok("a normalised file still passes the audit", audit(f)["ok"], audit(f)["problems"])
+
+print("\nthe two things a filter and a recruiter both read first")
+# A parser weights the job title, and a recruiter reads the filename before opening
+# anything. Neither was being written: the document had no title line and every export
+# was called "package-18.docx".
+from modules.render_docx import export_name  # noqa: E402
+
+f = build(headline="Lead Treasury Analyst")
+lines = str(audit(f)["text"]).splitlines()
+ok("the name is still the first line a parser sees", lines[0].strip() == "Jane Doe", lines[0])
+ok("their job title sits directly under it", lines[1].strip() == "Lead Treasury Analyst", lines[1])
+ok("contact still follows, so extraction is unaffected", "@" in lines[2], lines[2])
+
+r = check(f, MUST, expect_roles=1)
+ok("a headline does not break the parser simulation", r.passed, r.blocking)
+ok("the name is not confused with the headline",
+   simulate_parse("\n".join(lines)).name == "Jane Doe",
+   simulate_parse("\n".join(lines)).name)
+
+f2 = build()
+ok("no headline given, none written",
+   str(audit(f2)["text"]).splitlines()[1].strip().startswith("jane.doe@"),
+   str(audit(f2)["text"]).splitlines()[1])
+
+ok("the file on disk is named for a person and a role",
+   export_name("Sameer Iyer", "Lead Treasury Analyst", 18)
+   == "Sameer Iyer - Lead Treasury Analyst (18).docx",
+   export_name("Sameer Iyer", "Lead Treasury Analyst", 18))
+ok("the download drops the id, which means nothing to a recruiter",
+   export_name("Sameer Iyer", "Lead Treasury Analyst")
+   == "Sameer Iyer - Lead Treasury Analyst.docx",
+   export_name("Sameer Iyer", "Lead Treasury Analyst"))
+ok("a cover letter says so in the name",
+   export_name("Sameer Iyer", "Analyst", 3, kind="Cover Letter")
+   == "Sameer Iyer - Analyst - Cover Letter (3).docx",
+   export_name("Sameer Iyer", "Analyst", 3, kind="Cover Letter"))
+ok("characters a filesystem or a mail client would choke on are dropped",
+   export_name("Sameer Iyer", "Sr. Analyst / FP&A (Mumbai)", 4)
+   == "Sameer Iyer - Sr. Analyst FP&A Mumbai (4).docx",
+   export_name("Sameer Iyer", "Sr. Analyst / FP&A (Mumbai)", 4))
+ok("a missing title still gives a usable name",
+   export_name("Sameer Iyer", "", 9) == "Sameer Iyer (9).docx",
+   export_name("Sameer Iyer", "", 9))
+ok("a very long title is trimmed rather than refused",
+   len(export_name("Sameer Iyer", "Manager " * 30, 1)) < 100,
+   len(export_name("Sameer Iyer", "Manager " * 30, 1)))
 
 print("\ngate")
 try:

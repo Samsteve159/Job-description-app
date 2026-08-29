@@ -91,6 +91,8 @@ Being listed is not the same as being callable.
 
 ## Setup
 
+Double-click `Job App.app` once it is built. To set it up the first time:
+
 ```bash
 python3 -m pip install -r requirements.txt
 
@@ -98,6 +100,7 @@ cp .env.example .env                                   # add your NIM_API_KEY
 cp data/profile_facts.example.json data/profile_facts.json
 # edit profile_facts.json with your own career, then:
 python3 scripts/seed_profile.py
+bash desktop/build_app.sh                              # builds Job App.app
 ```
 
 `data/profile_facts.json` is the source of truth and is gitignored. The database is derived

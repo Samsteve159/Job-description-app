@@ -16,3 +16,8 @@ __pycache__/
 # Gmail OAuth client and the live token beside it
 data/gmail_client.json
 data/gmail_token.json
+
+# built by desktop/build_app.sh, not source
+Job App.app/
+desktop/AppIcon.iconset/
+desktop/icon-preview.png

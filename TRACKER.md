@@ -2,9 +2,12 @@
 
 Status for the Job App. Start here.
 
-**Updated 29 Aug 2026.** The app runs at `http://127.0.0.1:8100` via `./run.command`. The
-writer pipeline, both gates, the fit score, keyword placement, cover letters and the tracker
-are built and tested. Job scouting was dropped; the app starts at a posting you give it.
+**Updated 29 Aug 2026.** Double-click **`Job App.app`** in this folder, or the icon on the
+Desktop. It opens straight to the dashboard. `./run.command` still works if you want to
+watch the log.
+
+The writer pipeline, both gates, the fit score, keyword placement, cover letters and the
+tracker are built and tested. Job scouting was dropped; the app starts at a posting you give it.
 
 Scope note: this directory is the whole project. It does not read from, write to, or depend
 on anything outside `Job_App/`. The LinkedIn profile work is finished and lives elsewhere.
@@ -222,7 +225,8 @@ unevidenced. It asks a question, and what he types becomes the evidence.
 ## What is proven
 
 ```
-tests/test_ats.py        29      the ATS gate against real rejection modes
+tests/test_ats.py        41      the ATS gate against real rejection modes, plus
+                                 the title line and the export filename
 tests/test_contact.py    23      contact details, and surviving a re-seed
 tests/test_cover.py      36      cliches, invented praise, word counts, rendering
 tests/test_fetch_jd.py   30      refusing login walls and bot checks
@@ -233,7 +237,7 @@ tests/test_keywords.py   77      placement, the head-noun test, emphasis, unsupp
 tests/test_tracker.py    28      counting, the high-water mark, silence
 tests/test_webapp.py     69      every screen, and that a screen cannot skip a gate
                         ---
-                        446 passing
+                        398 passing
 ```
 
 The webapp suite's most important case: accept a reaching block, build, untick it, and
@@ -318,9 +322,10 @@ Full rationale in `DECISIONS.md`. The ones most likely to be re-litigated:
 
 | Date | What happened |
 |---|---|
-| 29 Aug 2026 | Scout Finds and the VM worker dropped. Job APIs do not reach LinkedIn or Naukri, and he already finds postings himself. Removed the `Find` table, three dead foreign keys, the unused `score` LLM stage and five environment variables. Two build slices gone, nothing working lost. Tests 446 to 445 |
+| 29 Aug 2026 (later) | A real macOS app bundle, `Job App.app`, with its own icon. Double-click opens the dashboard, no Terminal window, and a second launch does not start a second server. Then two ATS gaps found by checking rather than assuming: the document carried no job title line, and every export was called `package-18.docx`. Both fixed. Tests 385 to 398 |
+| 29 Aug 2026 | Scout Finds and the VM worker dropped. Job APIs do not reach LinkedIn or Naukri, and he already finds postings himself. Removed the `Find` table, three dead foreign keys, the unused `score` LLM stage and five environment variables. Two build slices gone, nothing working lost. Also corrected the test count, which had been carried forward as 446 for two sessions and never re-added: the suites sum to 385, not 445. The per-file numbers were right, the total was not |
 | 25 Aug 2026 | Backbone built. `extract` and `tailor` written, 20 guard tests passing. Model routing researched and corrected against the live catalogue. Moved into the project root. Paused |
-| 27 Aug 2026 (later) | Cover letters. Analyse screen split into two paths with skeletons and instant host warnings. Tests 341 to 446 |
+| 27 Aug 2026 (later) | Cover letters. Analyse screen split into two paths with skeletons and instant host warnings. Tests 341 to 386 |
 | 27 Aug 2026 | Fit score built: 1 to 100, red/amber/green, weighted by what the posting leans on and counted against the facts rather than the draft. Same posting now reuses its extraction, so closing a gap and rewriting cannot move the score for the wrong reason. Screening answers dropped. Tests 295 to 327 |
 | 26 Aug 2026 (night) | Gap closer built: asks about work the record does not cover, writes his answers back to the JSON. `extract` stopped deciding its own denominator. minimax-m3 dropped from every route, rate limited to 0 of 4. Tests 246 to 295 |
 | 26 Aug 2026 (evening) | Deterministic keyword placement. Spread went from 44% to 0%, and the fix uncovered that high coverage had been measuring fabrication. New guard for skill claims no fact supports. Tests 184 to 246 |

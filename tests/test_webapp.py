@@ -227,9 +227,11 @@ with TestClient(app) as client:
 
     r = client.get(f"/job/writer/{pid}/download", follow_redirects=False)
     check("the docx is served once it passes", r.status_code == 200, r.status_code)
-    check("the filename names the company",
-          "Acme" in r.headers.get("content-disposition", ""),
-          r.headers.get("content-disposition"))
+    disposition = r.headers.get("content-disposition", "")
+    check("the filename carries the person and the role, not the company",
+          "Jane" in disposition and "Spend%20Analyst" in disposition, disposition)
+    check("the package id is not inflicted on the recipient",
+          "(" not in disposition, disposition)
     check("it is a real docx", r.content[:2] == b"PK", r.content[:8])
 
     # And the whole point: untick it, and the export closes again.
@@ -270,8 +272,9 @@ with TestClient(app) as client:
     r = client.get(f"/job/writer/{pid}/cover/download", follow_redirects=False)
     check("the letter downloads", r.status_code == 200, r.status_code)
     check("it is a real docx", r.content[:2] == b"PK")
-    check("the filename says what it is",
-          "Cover-Letter" in r.headers.get("content-disposition", ""),
+    check("the filename says who it is from and what it is",
+          "Jane" in r.headers.get("content-disposition", "")
+          and "Cover%20Letter" in r.headers.get("content-disposition", ""),
           r.headers.get("content-disposition"))
 
     r = client.post(f"/job/writer/{pid}/cover/accept",

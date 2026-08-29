@@ -18,6 +18,7 @@ accepted, cannot reach the page even if a caller asks for it.
 """
 from __future__ import annotations
 
+import re
 import unicodedata
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -96,11 +97,35 @@ class Role:
 class ResumePayload:
     name: str
     contact: List[str]                      # ["email", "phone", "linkedin", "location"]
+    # The posting's own job title, written under the name. Parsers and recruiters both
+    # weight a title match, and this is the one place their exact title can appear without
+    # any claim about the past attached to it: it says what is being applied for.
+    headline: str = ""
     summary: str = ""
     skills: List[str] = field(default_factory=list)
     experience: List[Role] = field(default_factory=list)
     education: List[str] = field(default_factory=list)
     certifications: List[str] = field(default_factory=list)
+
+
+def export_name(name: str, title: str, package_id: Optional[int] = None,
+                kind: str = "Resume") -> str:
+    """The filename a recruiter sees, and that some parsers index.
+
+    "package-18.docx" tells the person opening it nothing and tells the parser less.
+    Pass package_id for the copy kept on disk, where two applications for the same title
+    at different companies must not overwrite each other. Leave it off for the download,
+    where the id is noise to the person receiving it.
+    """
+    def clean(value: str) -> str:
+        value = plain_text(value or "")
+        value = re.sub(r"[^A-Za-z0-9 ,.&+-]", " ", value)
+        return " ".join(value.split()).strip(" .-")[:60]
+
+    parts = [clean(name) or "Resume", clean(title), kind if kind != "Resume" else ""]
+    stem = " - ".join(part for part in parts if part)
+    suffix = f" ({package_id})" if package_id is not None else ""
+    return f"{stem}{suffix}.docx"
 
 
 # ------------------------------------------------------------------------ the gate
@@ -194,6 +219,9 @@ def render_resume(payload: ResumePayload, out_path: Path) -> Path:
     run.font.size = NAME_SIZE
     run.font.name = BODY_FONT
     run.font.color.rgb = INK
+
+    if payload.headline:
+        _line(doc, plain_text(payload.headline), bold=True)
 
     if payload.contact:
         _line(doc, " | ".join(payload.contact), muted=True)

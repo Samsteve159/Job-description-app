@@ -479,6 +479,7 @@ def to_payload(
     include_unaccepted: bool = False,
     contact: Optional[Sequence[str]] = None,
     name: Optional[str] = None,
+    headline: Optional[str] = None,
 ) -> ResumePayload:
     """Assemble accepted blocks plus verbatim facts into something renderable.
 
@@ -550,6 +551,7 @@ def to_payload(
 
     return ResumePayload(
         name=name,
+        headline=(headline or "").strip(),
         contact=contact,
         summary=summary,
         skills=skills,

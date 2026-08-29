@@ -31,7 +31,7 @@ from modules.ats import AtsBlocked, check as ats_check
 from modules.extract import Extraction, NotAJobDescription, extract
 from modules.fetch_jd import FetchError, clean, fetch
 from modules.llm import LLMError
-from modules.render_docx import (BlockedContentError, CoverPayload,  # noqa: E501
+from modules.render_docx import (BlockedContentError, CoverPayload, export_name,  # noqa: E501
                                  audit, render_cover, render_resume)
 from modules.tailor import Block, TailorResult, tailor, to_payload
 
@@ -370,7 +370,8 @@ def _build(request: Request, db: Session, package: Package):
     contact_module.bootstrap(db)
     payload = to_payload(result, facts,
                          contact=contact_module.resume_lines(db),
-                         name=contact_module.display_name(db))
+                         name=contact_module.display_name(db),
+                         headline=package.title or "")
 
     if not payload.experience and not payload.summary:
         return _package_view(request, db, package,
@@ -379,7 +380,7 @@ def _build(request: Request, db: Session, package: Package):
                              error_title="Nothing to build")
 
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    out = OUTPUT_DIR / f"package-{package.id}.docx"
+    out = OUTPUT_DIR / export_name(payload.name, package.title, package.id)
     try:
         path = render_resume(payload, out)
     except BlockedContentError as exc:
@@ -430,7 +431,8 @@ def download(package_id: int, db: Session = Depends(get_db)):
 
     package.status = "exported"
     db.commit()
-    name = f"{(package.company or 'resume').replace(' ', '-')}-Sameer-Iyer.docx"
+    contact_module.bootstrap(db)
+    name = export_name(contact_module.display_name(db), package.title or "")
     return FileResponse(path, filename=name, media_type=(
         "application/vnd.openxmlformats-officedocument.wordprocessingml.document"))
 
@@ -581,7 +583,8 @@ def cover_accept(request: Request, package_id: int, db: Session = Depends(get_db
         company=package.company or "",
         date_line=date.today().strftime("%d %B %Y"),
     )
-    out = OUTPUT_DIR / f"package-{package.id}-cover.docx"
+    out = OUTPUT_DIR / export_name(payload.name, package.title, package.id,
+                                   kind="Cover Letter")
     try:
         path = render_cover(payload, out)
     except BlockedContentError as exc:
@@ -607,7 +610,9 @@ def cover_download(package_id: int, db: Session = Depends(get_db)):
     path = Path(package.cover_path)
     if not path.exists():
         return RedirectResponse(f"/job/writer/{package_id}", status_code=303)
-    name = f"{(package.company or 'cover').replace(' ', '-')}-Cover-Letter.docx"
+    contact_module.bootstrap(db)
+    name = export_name(contact_module.display_name(db), package.title or "",
+                       kind="Cover Letter")
     return FileResponse(path, filename=name, media_type=(
         "application/vnd.openxmlformats-officedocument.wordprocessingml.document"))
 
