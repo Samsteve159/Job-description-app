@@ -40,5 +40,15 @@ PLIST
 codesign --force --sign - --identifier com.sameeriyer.jobapp "$APP" 2>/dev/null \
   && echo "signed (ad hoc)" || echo "WARNING: codesign failed, Desktop access may be refused"
 
-touch "$APP"
-echo "built: $APP"
+# The app goes on the Desktop, as the real bundle rather than a shortcut to one.
+# macOS grants folder permission to a signed bundle; point Full Disk Access at an alias
+# or a symlink and the grant lands on nothing, which looks exactly like a broken app.
+DEST="$HOME/Desktop/Job App.app"
+rm -rf "$DEST"
+[ -L "$HOME/Desktop/Job App" ] && rm -f "$HOME/Desktop/Job App"
+cp -R "$APP" "$DEST"
+codesign --force --sign - --identifier com.sameeriyer.jobapp "$DEST" 2>/dev/null || true
+touch "$APP" "$DEST"
+
+echo "built:     $APP"
+echo "installed: $DEST"

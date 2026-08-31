@@ -41,7 +41,9 @@ alert() {  # title, message
 # person allows it once. Ask for the folder before anything else touches it, so a refusal
 # produces one clear instruction rather than five confusing errors further down.
 if ! ls "$ROOT" >/dev/null 2>&1; then
-  say "cannot read $ROOT"
+  say "cannot read $ROOT: $(ls "$ROOT" 2>&1 | head -1)"
+  say "bundle: $SELF"
+  say "signature: $(codesign -dv "$SELF/../.." 2>&1 | grep -i 'CDHash\|Identifier' | tr '\n' ' ')"
   choice=$(osascript <<'OSA' 2>/dev/null
 display alert "Job App needs permission" message "macOS is blocking Job App from reading its own folder on your Desktop.
 
