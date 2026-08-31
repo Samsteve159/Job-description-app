@@ -389,14 +389,30 @@ def as_blocks(placement: Placement, block_factory: Any, start_index: int = 50) -
 # set does two kinds of harm: they can never be satisfied, so they sit in the denominator
 # forcing coverage down until a perfectly good resume is refused, and they crowd out the
 # terms that would actually have been matched.
-_NOT_A_KEYWORD = {
+_NOT_A_KEYWORD_WORDS = (
     "experience", "ability", "understanding", "knowledge", "skills", "expertise",
     "degree", "qualification", "background", "exposure", "familiarity", "judgment",
     "judgement", "collaboration", "communication", "partnership", "partnerships",
     "responsibility", "responsibilities", "requirement", "requirements", "initiative",
     "improvement", "measurement", "identification", "enablement", "adoption",
     "excellence", "leadership", "ownership", "delivery", "mindset", "practices",
-}
+    # Soft skills. Every analyst alive solves problems and juggles priorities, so a
+    # posting asking for them is describing a person rather than naming something a
+    # filter can screen for. Left in, they can never be evidenced, so they sit in the
+    # denominator dragging the score down and then appear in "genuine gaps", which
+    # reads as the app claiming he cannot solve problems.
+    "solving", "multitasking", "prioritisation", "prioritization", "teamwork",
+    "adaptability", "flexibility", "attention", "thinking", "motivation", "ethic",
+    "attitude", "drive", "passion", "curiosity", "diligence", "rigour", "rigor",
+    "acumen", "aptitude", "proficiency", "competency", "competencies", "capability",
+    "detail", "details", "mindsets", "environment", "pace",
+)
+
+# Canonicalised, because that is what the head noun is compared against. Spelled plural
+# and compared against a singular, "skills" never matched anything and "analytical
+# skills" sailed through as a must-have keyword.
+_NOT_A_KEYWORD = {canonical(word) for word in _NOT_A_KEYWORD_WORDS} | set(
+    _NOT_A_KEYWORD_WORDS)
 
 MAX_KEYWORD_WORDS = 3
 MAX_KEYWORD_CHARS = 42

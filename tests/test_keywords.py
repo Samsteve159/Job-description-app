@@ -19,7 +19,7 @@ from types import SimpleNamespace
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from modules.keywords import (MAX_SKILLS, _sections, canonical,  # noqa: E402
+from modules.keywords import (_NOT_A_KEYWORD, MAX_SKILLS, _sections, canonical,  # noqa: E402
                               find_evidence, place, sanitise, significant,
                               split_by_emphasis, unsupported, usable_keyword)
 
@@ -218,6 +218,31 @@ plain, plain_nice = split_by_emphasis("Just prose about SQL with no headings at 
                                       ["sql"])
 check("a posting with no headings puts everything in must",
       plain == ["sql"] and plain_nice == [], (plain, plain_nice))
+
+print("\nsoft skills are not search terms")
+# A real posting asked for problem solving, multitasking and analytical skills. None can
+# be evidenced from a career record, so all three sat in the denominator pushing the
+# score down and then appeared under "genuine gaps", which read as the app announcing
+# that a data analyst cannot solve problems or juggle priorities.
+for soft in ("problem solving", "multitasking", "analytical skills",
+             "attention to detail", "strong communication skills",
+             "ability to work in a fast paced environment", "excellent interpersonal skills",
+             "adaptability", "teamwork", "positive attitude", "commercial acumen"):
+    check(f"not a keyword: {soft!r}", not usable_keyword(soft))
+
+# The blocklist was spelled plural and compared against canonical singulars, so "skills"
+# never matched anything at all. This is the case that proves the wiring, not the words.
+check("the blocklist is compared in canonical form",
+      canonical("skills") in _NOT_A_KEYWORD and canonical("competencies") in _NOT_A_KEYWORD,
+      canonical("skills"))
+
+# The filter has to stay narrow. These name things a filter genuinely screens on, and
+# blocking any of them would cost real coverage.
+for real in ("sql", "power bi", "python", "data analytics", "data quality",
+             "data management", "root cause analysis", "supplier master data",
+             "liquidity risk management", "unspsc taxonomy", "product owner",
+             "regulatory reporting", "financial services", "spend analytics"):
+    check(f"still a keyword: {real!r}", usable_keyword(real))
 
 print(f"\n{passed} passed, {failed} failed")
 raise SystemExit(1 if failed else 0)
