@@ -22,7 +22,12 @@ from config import PAID_PROVIDERS, config, is_thinking_model
 
 log = logging.getLogger(__name__)
 
-_TIMEOUT = httpx.Timeout(120.0, connect=15.0)
+# Deliberately shorter than it looks like it should be. A stage that fails over spends
+# this twice, once on NIM and once on the paid fallback, and analyse runs two stages. At
+# 120s that is eight minutes of worst case behind a screen that gives up at five, which
+# is exactly how a working app comes to look hung. 60 keeps the worst case to four
+# minutes, inside the window, and no successful call has ever come close to it.
+_TIMEOUT = httpx.Timeout(60.0, connect=15.0)
 
 
 class LLMError(RuntimeError):

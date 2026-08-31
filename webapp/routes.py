@@ -12,6 +12,7 @@ because a second caller would then have no protection at all.
 from __future__ import annotations
 
 import hashlib
+import time
 from urllib.parse import quote
 import logging
 from datetime import date
@@ -184,7 +185,10 @@ def analyse(request: Request, db: Session = Depends(get_db),
             extraction = Extraction.from_dict(seen.extraction)
             log.info("reusing the extraction from package %d, same posting", seen.id)
         else:
+            t0 = time.monotonic()
             extraction = extract(text)
+            log.info("analyse: extract took %.1fs for %d characters",
+                     time.monotonic() - t0, len(text))
     except (NotAJobDescription, LLMError, RuntimeError) as exc:
         return render(request, "writer.html", section="writer", url=url, job_text=text,
                       error=f"Could not read that as a job description: {exc}",
@@ -200,7 +204,9 @@ def analyse(request: Request, db: Session = Depends(get_db),
                       packages=[])
 
     try:
+        t0 = time.monotonic()
         result = tailor(extraction, facts)
+        log.info("analyse: tailor took %.1fs", time.monotonic() - t0)
     except (LLMError, RuntimeError) as exc:
         return render(request, "writer.html", section="writer", url=url, job_text=text,
                       error=f"The tailor stage failed: {exc}",
@@ -464,7 +470,9 @@ def rewrite(request: Request, package_id: int, db: Session = Depends(get_db)):
     before = (package.fit or {}).get("score")
 
     try:
+        t0 = time.monotonic()
         result = tailor(extraction, facts)
+        log.info("analyse: tailor took %.1fs", time.monotonic() - t0)
     except (LLMError, RuntimeError) as exc:
         return _package_view(request, db, package, error=str(exc),
                              error_title="Could not write it again")
