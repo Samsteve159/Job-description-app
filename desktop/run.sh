@@ -9,7 +9,7 @@ mkdir -p "$(dirname "$LOG")" 2>/dev/null
 say() { echo "$(date '+%H:%M:%S') $*" >>"$LOG"; }
 echo "--- launch $(date '+%Y-%m-%d %H:%M:%S') ---" >>"$LOG"
 
-SELF="$(cd "$(dirname "$0")" && pwd)"
+SELF="$(cd "$(dirname "$0")" && pwd)"          # .../Job App.app/Contents/Resources
 ROOT="$(cd "$SELF/../../.." 2>/dev/null && pwd)"
 [ -f "$ROOT/main.py" ] || ROOT="__PROJECT_ROOT__"      # baked in, so a copied .app still works
 say "root: $ROOT"

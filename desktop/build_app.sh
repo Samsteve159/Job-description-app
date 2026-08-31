@@ -12,8 +12,11 @@ APP="$ROOT/Job App.app"
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 
-sed "s|__PROJECT_ROOT__|$ROOT|g" "$HERE/launcher.sh" > "$APP/Contents/MacOS/JobApp"
-chmod +x "$APP/Contents/MacOS/JobApp"
+# A compiled binary, not a script. macOS gives file-access permissions to the process it
+# launches; for a script that is /bin/bash, so a grant made to Job App applies to nothing.
+clang -O2 -Wall -o "$APP/Contents/MacOS/JobApp" "$HERE/launcher.c"
+sed "s|__PROJECT_ROOT__|$ROOT|g" "$HERE/run.sh" > "$APP/Contents/Resources/run.sh"
+chmod +x "$APP/Contents/MacOS/JobApp" "$APP/Contents/Resources/run.sh"
 cp "$HERE/AppIcon.icns" "$APP/Contents/Resources/AppIcon.icns"
 
 cat > "$APP/Contents/Info.plist" <<'PLIST'
