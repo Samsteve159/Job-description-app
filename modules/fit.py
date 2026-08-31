@@ -55,12 +55,25 @@ class Component:
         return int(round(100 * self.points / self.ceiling)) if self.ceiling else 0
 
 
+# The call, in the two words you want before reading anything else. A score is a
+# comparison and a verdict is a decision, and on an evening with nine tabs open the
+# decision is the useful half. Deliberately only three: a scale with more rungs than
+# this invites deliberation, which is the thing it exists to save you.
+VERDICTS = {
+    GREEN: ("Apply", "Your record covers what they screen on."),
+    AMBER: ("Your call", "Applicable, but you would be arguing for parts of it."),
+    RED: ("Skip it", "The gaps are in what the job is about, not the wording."),
+}
+
+
 @dataclass
 class Fit:
     score: int = 0
     components: List[Component] = field(default_factory=list)
     headline: str = ""
     advice: List[str] = field(default_factory=list)
+    # what is missing that the posting weights most, so the verdict can name it
+    weakest: str = ""
 
     @property
     def band(self) -> str:
@@ -68,10 +81,28 @@ class Fit:
             return GREEN
         return AMBER if self.score >= AMBER_FLOOR else RED
 
+    @property
+    def call(self) -> str:
+        return VERDICTS[self.band][0]
+
+    @property
+    def because(self) -> str:
+        """One line, and it names the specific thing wherever there is one to name."""
+        if self.weakest:
+            if self.band == GREEN:
+                return (f"Strong overall, though nothing shows {self.weakest}. "
+                        f"Apply if you can speak to it.")
+            if self.band == AMBER:
+                return (f"Hinges on {self.weakest}, which your record does not show. "
+                        f"Worth it only if you can argue it.")
+            return f"Nothing shows {self.weakest}, and the posting leans on it hardest."
+        return VERDICTS[self.band][1]
+
     def as_dict(self) -> Dict[str, Any]:
         return {
             "score": self.score, "band": self.band, "headline": self.headline,
-            "advice": self.advice,
+            "advice": self.advice, "call": self.call, "because": self.because,
+            "weakest": self.weakest,
             "components": [{"name": c.name, "points": round(c.points, 1),
                             "ceiling": c.ceiling, "percent": c.percent,
                             "detail": c.detail, "good": c.good}
@@ -252,6 +283,9 @@ def assess(extraction: Any, placement: Any, facts: Sequence[Any],
     # "your record covers what they asked for" would be false in the way that matters.
     heaviest = heavy_missing[0] if heavy_missing else None
     heavy_share = (term_weights.get(heaviest, 0) / total_weight) if heaviest and total_weight else 0
+
+    if heaviest and heavy_share >= 0.08:
+        fit.weakest = heaviest
 
     if heavy_share >= 0.10 and fit.band != RED:
         # Named in amber as well as green. Amber alone says "some work needed" without

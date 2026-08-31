@@ -195,5 +195,30 @@ check("an empty Placement object does not break it", as_object.score == as_dict.
 check("None works too", fit.assess(extraction(), None, FACTS).score == as_dict.score)
 check("as_dict round trips", "components" in as_dict.as_dict())
 
+print("\nthe verdict, which is the half you read first")
+from modules.fit import Fit  # noqa: E402
+
+check("green says apply", Fit(score=88).call == "Apply", Fit(score=88).call)
+check("amber leaves it to him", Fit(score=55).call == "Your call", Fit(score=55).call)
+check("red says do not", Fit(score=22).call == "Skip it", Fit(score=22).call)
+check("the boundary at 70 is green", Fit(score=70).call == "Apply")
+check("the boundary at 40 is not red", Fit(score=40).call == "Your call")
+check("39 is red", Fit(score=39).call == "Skip it")
+
+# A verdict that cannot say why is worth much less than one that can.
+named = Fit(score=75, weakest="supplier master data")
+check("green names what is still missing", "supplier master data" in named.because)
+check("and still says apply", named.call == "Apply")
+weak = Fit(score=52, weakest="model governance")
+check("amber names the thing it hinges on", "model governance" in weak.because)
+low = Fit(score=30, weakest="model governance")
+check("red names it too", "model governance" in low.because)
+check("with nothing to name it still gives a reason",
+      len(Fit(score=30).because) > 20, Fit(score=30).because)
+
+d = Fit(score=80, weakest="sql").as_dict()
+check("the verdict survives into the stored package",
+      d["call"] == "Apply" and "sql" in d["because"] and d["weakest"] == "sql", d)
+
 print(f"\n{passed} passed, {failed} failed")
 raise SystemExit(1 if failed else 0)

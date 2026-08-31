@@ -325,6 +325,24 @@ select {
 .panel.fit-amber { border-left: 3px solid var(--amber); }
 .panel.fit-red   { border-left: 3px solid var(--red); }
 
+/* The call, before the number. A score is a comparison; a verdict is a decision, and
+   the decision is what you want at a glance with nine tabs open. */
+.verdict {
+  display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap;
+  margin: 0 0 10px; padding: 9px 13px; border-radius: 6px;
+  border: 1px solid transparent;
+}
+.verdict-call {
+  font-size: 17px; font-weight: 700; letter-spacing: -0.01em; white-space: nowrap;
+}
+.verdict-why { font-size: 13.5px; color: var(--muted); }
+.verdict-green { background: var(--accent-soft); border-color: var(--accent); }
+.verdict-green .verdict-call { color: var(--accent); }
+.verdict-amber { background: var(--amber-soft); border-color: var(--amber); }
+.verdict-amber .verdict-call { color: var(--amber); }
+.verdict-red   { background: var(--red-soft); border-color: var(--red); }
+.verdict-red .verdict-call { color: var(--red); }
+
 .fit-top { display: flex; gap: 22px; align-items: center; flex-wrap: wrap; }
 .fit-dial {
   width: 104px; height: 104px; border-radius: 50%;
