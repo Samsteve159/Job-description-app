@@ -12,6 +12,7 @@ because a second caller would then have no protection at all.
 from __future__ import annotations
 
 import hashlib
+from urllib.parse import quote
 import logging
 from datetime import date
 from pathlib import Path
@@ -290,11 +291,14 @@ def _package_view(request: Request, db: Session, package: Package,
 
 
 @router.get("/job/writer/{package_id}")
-def review(request: Request, package_id: int, db: Session = Depends(get_db)):
+def review(request: Request, package_id: int, db: Session = Depends(get_db),
+           error: str = "", error_title: str = ""):
     package = db.get(Package, package_id)
     if package is None:
         return RedirectResponse("/job/writer", status_code=303)
-    return _package_view(request, db, package)
+    return _package_view(request, db, package, error=error or None,
+                         error_title=error_title or None,
+                         error_kind="bad" if error else None)
 
 
 @router.post("/job/writer/{package_id}/accept")
@@ -418,7 +422,10 @@ def download(package_id: int, db: Session = Depends(get_db)):
 
     path = Path(package.resume_path)
     if not path.exists():
-        return RedirectResponse(f"/job/writer/{package_id}", status_code=303)
+        return RedirectResponse(
+            f"/job/writer/{package_id}?error_title=That+file+is+gone"
+            "&error=The+built+resume+is+no+longer+on+disk.+Build+it+again.",
+            status_code=303)
 
     extraction = Extraction.from_dict(package.extraction or {})
     report = ats_check(path, must_keywords=extraction.must_keywords(),
@@ -426,8 +433,11 @@ def download(package_id: int, db: Session = Depends(get_db)):
     try:
         from modules.ats import gate as ats_gate
         ats_gate(report)
-    except AtsBlocked:
-        return RedirectResponse(f"/job/writer/{package_id}", status_code=303)
+    except AtsBlocked as exc:
+        # Silently bouncing back looked like a broken button. Say what the filter would do.
+        return RedirectResponse(
+            f"/job/writer/{package_id}?error_title=" + quote("An ATS would reject this")
+            + "&error=" + quote(str(exc)), status_code=303)
 
     package.status = "exported"
     db.commit()
