@@ -283,5 +283,23 @@ check("and a joined form does not swallow its neighbours",
       and "daily" in significant("we use chat gpt daily"),
       significant("we use chat gpt daily"))
 
+print("\nrequirements that describe the work rather than name it")
+# From a real Deutsche Bank procurement posting. Every one of these was taken as a
+# must-have keyword, none can appear on a resume, and each sat in the denominator and
+# then in the list of things his record supposedly lacks.
+for phrase in ("ai solutions", "insights generation", "cross functional",
+               "generate fresh insights", "key deliverables", "ba da"):
+    check(f"not a keyword: {phrase!r}", not usable_keyword(phrase))
+
+# "Strong BA-DA skills" became "ba da". Two initials the posting coined out of two other
+# acronyms, matchable by nothing. But a single short token is a real term.
+for short in ("ai", "ml", "bi", "sql"):
+    check(f"still a keyword: {short!r}", usable_keyword(short))
+
+# The same posting's genuine terms, which the filter must not touch.
+for real in ("ai architect", "procurement data", "regulatory reporting",
+             "data visualisation", "dashboard automation", "vendor spend"):
+    check(f"still a keyword: {real!r}", usable_keyword(real))
+
 print(f"\n{passed} passed, {failed} failed")
 raise SystemExit(1 if failed else 0)

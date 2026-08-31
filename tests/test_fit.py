@@ -119,14 +119,17 @@ print("\nlocation matches on the city, not the country")
 f = fit.assess(extraction(location="Bengaluru, Karnataka, India"), {}, FACTS,
                location="Mumbai, India")
 loc = [c for c in f.components if c.name == "Location"][0]
-check("another Indian city is not home", loc.points < 10, loc.points)
-check("but it is still the right country", loc.points >= 5, loc.points)
-check("the reason names relocation", "relocation" in loc.detail, loc.detail)
+check("another Indian city is recognised as not home",
+      "wrong city" in loc.detail, loc.detail)
+check("and says a move would be involved", "move" in loc.detail, loc.detail)
+check("but it earns nothing, because distance is not ability", loc.points == 0)
 
 f = fit.assess(extraction(location="Mumbai, India. Hybrid"), {}, FACTS,
                location="Mumbai, India")
-check("his own city scores full",
-      [c for c in f.components if c.name == "Location"][0].points == 10)
+home = [c for c in f.components if c.name == "Location"][0]
+check("his own city is named as his", "where you are" in home.detail, home.detail)
+check("and earns nothing either, so the two cannot differ on score",
+      home.points == 0 and home.ceiling == 0)
 
 f = fit.assess(extraction(location="London, United Kingdom"), {}, FACTS,
                location="Mumbai, India")
@@ -250,6 +253,33 @@ check("full must coverage stops short of the ceiling",
       _projection(MUST, MUST, {"added": []}))
 check("no must-haves is said plainly, not divided by zero",
       "Nothing to measure" in _projection([], [], {}))
+
+print("\nlocation is flagged, never scored")
+# Where a job is says nothing about whether he can do it. Scoring it mixed two unlike
+# things into one number: a role he is perfect for in the wrong city scored below a role
+# he is weak on down the road. Whether to move is his call and is not a fit question.
+from modules.fit import assess  # noqa: E402
+
+def _loc(place):
+    ex = SimpleNamespace(title="Data Analyst", seniority="analyst", location=place,
+                         jd_text="Data Analyst. SQL and Power BI.",
+                         must_keywords=lambda: ["sql", "power bi"],
+                         nice_keywords=lambda: [])
+    return assess(ex, {"gaps": [], "already_present": ["sql"], "added": []}, FACTS,
+                  location="Mumbai, India")
+
+near, far = _loc("Mumbai, India"), _loc("London, United Kingdom")
+check("the same job scores the same wherever it is", near.score == far.score,
+      (near.score, far.score))
+check("but it is still reported",
+      any(c.name == "Location" for c in far.components))
+check("and it earns nothing either way",
+      all(c.ceiling == 0 for c in far.components if c.name == "Location"))
+check("the flag still says what it found",
+      "london" in next(c.detail for c in far.components if c.name == "Location").lower(),
+      next(c.detail for c in far.components if c.name == "Location"))
+check("and marks an outside-target city as not good",
+      not next(c.good for c in far.components if c.name == "Location"))
 
 print(f"\n{passed} passed, {failed} failed")
 raise SystemExit(1 if failed else 0)

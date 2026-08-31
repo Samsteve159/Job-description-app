@@ -433,7 +433,8 @@ _NOT_A_KEYWORD_WORDS = (
     "attitude", "drive", "passion", "curiosity", "diligence", "rigour", "rigor",
     "acumen", "aptitude", "proficiency", "competency", "competencies", "capability",
     "detail", "details", "mindsets", "environment", "pace",
-    "presentation", "presentations",
+    "presentation", "presentations", "solution", "solutions", "generation",
+    "functional", "insight", "insights", "deliverable", "deliverables",
 )
 
 # Canonicalised, because that is what the head noun is compared against. Spelled plural
@@ -494,6 +495,13 @@ def usable_keyword(keyword: str, company: Optional[str] = None) -> bool:
     if not words or len(words) > MAX_KEYWORD_WORDS:
         return False
     if is_org_name(keyword, company):
+        return False
+    # "Strong BA-DA skills" produced the keyword "ba da". Two initials are an acronym the
+    # posting made up out of two other acronyms, and nothing on a resume will ever match
+    # it. A term made only of fragments this short is noise, not a search term.
+    # A single short token is fine: ai, ml, r and bi are all real search terms. It is
+    # only the run of them that is noise.
+    if len(words) > 1 and all(len(word) <= 2 for word in words):
         return False
     # The head noun decides it. A real search term names a thing: a tool, a domain, a
     # role, a discipline. "liquidity risk management" and "product owner" end in a thing.

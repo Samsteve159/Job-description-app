@@ -286,22 +286,26 @@ def assess(extraction: Any, placement: Any, facts: Sequence[Any],
                       + ("" if passed else " and is currently refused"),
                       good=passed))
 
-    # 5. location, 10 points
+    # 5. location. Flagged, never scored.
+    #
+    # Where a job is says nothing about whether he can do it, and scoring it mixed two
+    # unlike things into one number: a role he is perfect for in the wrong city came out
+    # lower than a role he is weak on down the road. Whether to move is his decision and
+    # it has nothing to do with fit. Ceiling zero, so it reports and contributes nothing.
     job_place = (getattr(extraction, "location", "") or "").lower()
     home = (location or "").lower()
     if not job_place:
-        add(Component("Location", 7.0, 10, "the posting does not say", good=True))
+        note, good = "the posting does not say where", True
     elif _REMOTE.search(job_place):
-        add(Component("Location", 10.0, 10, "remote", good=True))
+        note, good = "remote", True
     elif home and home.split(",")[0].strip() and home.split(",")[0].strip() in job_place:
         # the CITY, not the country. Matching on "india" scored Bengaluru as home.
-        add(Component("Location", 10.0, 10, f"{job_place} matches where you are", good=True))
+        note, good = f"{job_place}, where you are", True
     elif "india" in job_place:
-        add(Component("Location", 6.0, 10,
-                      f"{job_place}. Right country, wrong city, so relocation is on the "
-                      f"table", good=True))
+        note, good = f"{job_place}. Right country, wrong city, so a move is on the table", True
     else:
-        add(Component("Location", 3.0, 10, f"{job_place}, outside your target", good=False))
+        note, good = f"{job_place}, outside your target", False
+    add(Component("Location", 0.0, 0, note, good=good))
 
     # 6. the honesty penalty. Deducted, never awarded.
     if unsupported:
