@@ -242,9 +242,11 @@ def extract(jd_text: str) -> Extraction:
     # resume contains and no filter screens on, each one sitting in the denominator
     # pushing coverage toward the threshold that refuses the export. The requirement text
     # is kept and still shown; only its claim to be a keyword is dropped.
+    company_name = result.company or ""
     dropped = []
     for requirement in result.all_requirements:
-        if requirement.keyword and not keyword_tools.usable_keyword(requirement.keyword):
+        if requirement.keyword and not keyword_tools.usable_keyword(
+                requirement.keyword, company_name):
             dropped.append(requirement.keyword)
             requirement.keyword = ""
 
@@ -256,7 +258,8 @@ def extract(jd_text: str) -> Extraction:
 
     # cap the must-have set. Beyond about a dozen, a job description is listing its
     # wishes rather than its filter, and every extra term makes the score noisier.
-    kept = keyword_tools.sanitise([r.keyword for r in result.must if r.keyword])
+    kept = keyword_tools.sanitise([r.keyword for r in result.must if r.keyword],
+                                  company=company_name)
     for requirement in result.must:
         if requirement.keyword and requirement.keyword.lower() not in kept:
             dropped.append(requirement.keyword)

@@ -420,7 +420,35 @@ MAX_KEYWORD_CHARS = 42
 MAX_MUST_KEYWORDS = 12
 
 
-def usable_keyword(keyword: str) -> bool:
+# Words that name the employer or the org chart rather than the work. A posting says its
+# own name constantly, so the name is the single most repeated proper noun in the text
+# and the easiest thing for an extractor to mistake for the subject of the job.
+_ORG_NOISE = {
+    "company", "employer", "client", "team", "department", "division", "group",
+    "business", "organisation", "organization", "firm", "office", "centre", "center",
+    "headquarters", "subsidiary", "brand", "role", "position", "vacancy", "opportunity",
+}
+
+
+def is_org_name(keyword: str, company: Optional[str] = None) -> bool:
+    """Is this the hiring company's name rather than something he could have done?
+
+    A posting from Marsh produced "marsh" as a must-have keyword, and it appeared under
+    genuine gaps: the app reporting that his record does not evidence the company he is
+    applying to. No filter screens for its own name, and nobody can close that gap.
+    """
+    words = significant(keyword)
+    if not words:
+        return False
+    if set(words) & _ORG_NOISE:
+        return True
+    if not company:
+        return False
+    company_words = set(significant(company)) - _ORG_NOISE
+    return bool(company_words) and set(words).issubset(company_words)
+
+
+def usable_keyword(keyword: str, company: Optional[str] = None) -> bool:
     """Is this something a person would actually write on a resume?
 
     `extract` lifts keywords out of the job description, and a job description contains
@@ -438,6 +466,8 @@ def usable_keyword(keyword: str) -> bool:
     words = significant(keyword)
     if not words or len(words) > MAX_KEYWORD_WORDS:
         return False
+    if is_org_name(keyword, company):
+        return False
     # The head noun decides it. A real search term names a thing: a tool, a domain, a
     # role, a discipline. "liquidity risk management" and "product owner" end in a thing.
     # "ai use case identification" and "independent judgment" end in an abstraction, and
@@ -446,7 +476,8 @@ def usable_keyword(keyword: str) -> bool:
     return words[-1] not in _NOT_A_KEYWORD
 
 
-def sanitise(candidates: Sequence[str], limit: int = MAX_MUST_KEYWORDS) -> List[str]:
+def sanitise(candidates: Sequence[str], limit: int = MAX_MUST_KEYWORDS,
+             company: Optional[str] = None) -> List[str]:
     """Keep the searchable ones, deduplicated by meaning, in the order given.
 
     Order is preserved rather than sorted, because `extract` returns must-haves roughly
@@ -456,7 +487,7 @@ def sanitise(candidates: Sequence[str], limit: int = MAX_MUST_KEYWORDS) -> List[
     seen: Set[str] = set()
     for candidate in candidates:
         candidate = (candidate or "").strip()
-        if not usable_keyword(candidate):
+        if not usable_keyword(candidate, company):
             continue
         key = " ".join(significant(candidate))
         if key in seen:

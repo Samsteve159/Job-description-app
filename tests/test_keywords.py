@@ -244,5 +244,23 @@ for real in ("sql", "power bi", "python", "data analytics", "data quality",
              "regulatory reporting", "financial services", "spend analytics"):
     check(f"still a keyword: {real!r}", usable_keyword(real))
 
+print("\nthe company is not a skill")
+# A Marsh posting produced "marsh" as a must-have keyword, and it appeared under genuine
+# gaps: the app reporting that his record does not evidence the company he is applying
+# to. No filter screens for its own name, and no gap closer can close it.
+from modules.keywords import is_org_name  # noqa: E402
+
+check("the employer's name is not a keyword", not usable_keyword("marsh", "Marsh"))
+check("nor is it with the company written differently",
+      not usable_keyword("marsh", "Marsh McLennan"))
+check("org furniture is never a keyword",
+      not usable_keyword("the team") and not usable_keyword("our client")
+      and not usable_keyword("business division"))
+check("a real term at the same company survives", usable_keyword("power bi", "Marsh"))
+check("and so does one that merely contains the name",
+      usable_keyword("marsh risk analytics", "Marsh"))
+check("with no company given, nothing extra is blocked", usable_keyword("acme", None))
+check("is_org_name says why", is_org_name("marsh", "Marsh") and not is_org_name("sql", "Marsh"))
+
 print(f"\n{passed} passed, {failed} failed")
 raise SystemExit(1 if failed else 0)
