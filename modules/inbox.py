@@ -190,6 +190,53 @@ def off_target(listings: Sequence[Listing]) -> List[Listing]:
     return out
 
 
+# ------------------------------------------------------------------- relevance
+#
+# Deliberately NOT the fit score. That one reads a full job description, weighs what the
+# posting leans on, and checks whether the rendered document survives a parser. An alert
+# gives a job title and a city. Pretending the two numbers are the same thing would make
+# a skim-level guess look like the considered answer, and he would stop opening jobs on
+# the strength of it.
+#
+# So this scores one question only: does the title name work he has evidence of doing.
+# Fast, free, deterministic, and honest about being shallow.
+
+_SENIORITY_UP = re.compile(r"\b(head of|director|vp|vice president|chief|principal)\b", re.I)
+_SENIORITY_DOWN = re.compile(r"\b(intern|graduate|trainee|junior|assistant|associate)\b", re.I)
+
+
+def relevance(listing: "Listing", facts: Sequence[Any]) -> int:
+    """0 to 100 on the title alone. Green means open it, red means probably do not."""
+    from modules import keywords as kw
+
+    words = [w for w in kw.significant(listing.title) if len(w) >= 2]
+    if not words:
+        return 0
+
+    # Counted, not averaged. LinkedIn's anchor puts the employer inside the title, so a
+    # ratio over every word scored "Procurement Specialist JBS Australia Pty Limited" at
+    # 30, because Pty and Limited outvoted Procurement. What matters is how much of his
+    # actual work the title names, not what fraction of the string it occupies.
+    hits = sum(1 for word in set(words) if kw.find_evidence(word, facts) is not None)
+    score = {0: 0.0, 1: 45.0, 2: 68.0, 3: 84.0}.get(hits, 95.0)
+
+    title = listing.title or ""
+    if _SENIORITY_UP.search(title):
+        score -= 25          # two rungs up is rarely shortlisted, whatever the words match
+    elif _SENIORITY_DOWN.search(title):
+        score -= 20          # a step down reads as overqualified
+
+    haystack = f"{listing.location} {title}".lower()
+    if listing.location and not any(place in haystack for place in TARGETS):
+        score -= 20          # not a judgement on the job, a judgement on the commute
+
+    return max(0, min(100, int(round(score))))
+
+
+def band(score: int) -> str:
+    return "green" if score >= 60 else ("amber" if score >= 35 else "red")
+
+
 def scan(days: int = 7, limit: int = 60, svc: Any = None) -> List[Listing]:
     """Every job any board emailed him recently, deduplicated, newest first."""
     from modules import gmail

@@ -1,50 +1,76 @@
 {% extends "base.html" %}
 {% block body %}
 
-<h1>Job Alerts</h1>
+<div style="display: flex; gap: 16px; align-items: baseline; flex-wrap: wrap;">
+  <h1 style="margin-bottom: 0;">Job Alerts</h1>
+  <span style="flex: 1;"></span>
+  {% if cleared_count %}
+    <form method="post" action="/job/alerts/restore">
+      <button type="submit" class="secondary">Bring back {{ cleared_count }} cleared</button>
+    </form>
+  {% endif %}
+  {% if rows %}
+    <form method="post" action="/job/alerts/clear" id="clearAll">
+      {% for r in rows %}
+        <input type="hidden" name="key" value="{{ r.listing.key }}">
+        <input type="hidden" name="label" value="{{ r.listing.label }}">
+      {% endfor %}
+      <button type="submit" class="danger">Clear all {{ rows|length }}</button>
+    </form>
+  {% endif %}
+</div>
+
 <p class="lead">
-  {{ listings|length }} job{{ '' if listings|length == 1 else 's' }} the boards emailed you
-  in the last {{ days }} days.
+  {{ rows|length }} job{{ '' if rows|length == 1 else 's' }} the boards emailed you in the
+  last {{ days }} days, best match first.
 </p>
 
 {% if off_target %}
 <div class="notice warn">
   <strong>{{ off_target|length }} of these are outside India, the UAE and remote.</strong>
   <p style="margin: 6px 0 0;">
-    LinkedIn knows where you live and keeps matching on it, whatever your alerts say. Fix
-    it at the source: on each saved search set the location explicitly, and check
-    <em>Jobs, Preferences, Open to work</em> names the cities you actually want.
+    LinkedIn matches on where you live, whatever your alerts say. Set the location
+    explicitly on each saved search, and check <em>Jobs, Preferences</em> names the cities
+    you actually want.
   </p>
 </div>
 {% endif %}
 
-{% if listings %}
+{% if rows %}
 <div class="panel">
-  {% for l in listings %}
-    <div style="display: flex; gap: 14px; align-items: baseline; padding: 11px 0;
+  {% for r in rows %}
+    <div style="display: flex; gap: 12px; align-items: baseline; padding: 11px 0;
                 border-bottom: 1px solid var(--rule);">
-      <span class="badge section" style="flex: none;">{{ l.source }}</span>
+      <span class="badge {{ 'verified' if r.band == 'green' else ('inferred' if r.band == 'amber' else 'blocked') }}"
+            style="flex: none; min-width: 34px; text-align: center;"
+            title="How much of this title names work your record evidences. A skim, not the fit score.">{{ r.score }}</span>
       <span style="flex: 1; min-width: 0;">
-        <span class="block-text">{{ l.label }}</span>
+        <span class="block-text">{{ r.listing.label }}</span>
         <span class="hint" style="display: block; margin-top: 2px;">
-          {{ l.location or 'location not given' }}
-          {%- if l.received %} &middot; {{ l.received.strftime('%d %b') }}{% endif %}
+          {{ r.listing.source }} &middot; {{ r.listing.location or 'location not given' }}
+          {%- if r.listing.received %} &middot; {{ r.listing.received.strftime('%d %b') }}{% endif %}
         </span>
       </span>
-      {% if l.url %}
-        <a class="button secondary" href="{{ l.url }}" target="_blank" rel="noopener">Open</a>
+      {% if r.listing.url %}
+        <a class="button secondary" href="{{ r.listing.url }}" target="_blank" rel="noopener">Open</a>
       {% endif %}
-      <a class="button" href="/job/writer">Draft for this</a>
+      <a class="button" href="/job/writer">Draft</a>
+      <form method="post" action="/job/alerts/clear">
+        <input type="hidden" name="key" value="{{ r.listing.key }}">
+        <input type="hidden" name="label" value="{{ r.listing.label }}">
+        <button type="submit" class="danger">Clear</button>
+      </form>
     </div>
   {% endfor %}
 </div>
 <p class="hint">
-  Those boards refuse automated fetches, so open the job, copy the description, and paste
-  it into the writer. The link is here so you never have to go looking.
+  The number is a skim: how much of the title names work your record evidences. It is not
+  the fit score, which reads the whole posting. Those boards refuse automated fetches, so
+  open the job, copy the description, and paste it into the writer.
 </p>
 {% else %}
 <div class="empty panel">
-  <p>Nothing yet. Set job alerts on LinkedIn and Naukri and they will start arriving.</p>
+  <p>Nothing here. Either no alerts have arrived, or you have cleared them all.</p>
 </div>
 {% endif %}
 

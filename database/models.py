@@ -3,7 +3,7 @@
 Two families of tables that must never touch each other:
 
   Sections 1 and 2 (Resume & Cover Writer, and the application tracker)
-      ContactDetail, ProfileFact, Requirement, Package, GeneratedBlock,
+      ContactDetail, DismissedAlert, ProfileFact, Requirement, Package, GeneratedBlock,
       Application
 
   Section 3 (Interview Brief) -- fully standalone
@@ -82,6 +82,21 @@ class ProfileFact(Base):
 
 
 # ----------------------------------------------------------------- section 2: writer
+
+class DismissedAlert(Base):
+    """A job alert he has cleared away.
+
+    The alerts screen re-reads Gmail on every visit, so a cleared row would come back
+    thirty seconds later with nothing to stop it. Keyed by source and the board's own job
+    id, which is stable across the several emails a board sends about the same job.
+    """
+    __tablename__ = "dismissed_alerts"
+
+    id = Column(Integer, primary_key=True)
+    key = Column(String(128), nullable=False, unique=True, index=True)
+    label = Column(Text, nullable=True)          # kept so a mistake is recoverable
+    created_at = Column(DateTime, default=datetime.utcnow)
+
 
 class Requirement(Base):
     __tablename__ = "requirements"

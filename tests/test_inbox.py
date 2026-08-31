@@ -119,5 +119,51 @@ check("a target city is not", all(l.external_id != "2" for l in off))
 check("remote is not", all(l.external_id != "4" for l in off))
 check("and an unknown location is not accused", all(l.external_id != "5" for l in off))
 
+print("\nthe skim score")
+# Deliberately not the fit score. That one reads a whole posting; this reads a title. A
+# number that looked like the considered answer would stop him opening jobs on a guess.
+class F:
+    _next = [0]
+
+    def __init__(self, text, kind="skill"):
+        self._next[0] += 1
+        self.id = self._next[0]          # a fact with no id cannot be cited, so cannot count
+        self.text, self.kind, self.tags, self.org = text, kind, [], None
+        self.verified = True
+
+RECORD = [F("Procurement Analytics"), F("Data Analysis"), F("SQL"), F("Power BI"),
+          F("Treasury Management"), F("Management Consulting")]
+
+def score(title, location="Mumbai, India"):
+    return inbox.relevance(Listing("linkedin", "1", "u", title=title,
+                                   location=location), RECORD)
+
+check("a title of his own work scores well", score("Procurement Data Analyst") >= 60,
+      score("Procurement Data Analyst"))
+check("a title of nobody's work scores nothing",
+      score("Veterinary Nurse") == 0, score("Veterinary Nurse"))
+
+# LinkedIn puts the employer inside the title, so averaging over every word scored
+# "Procurement Specialist JBS Australia Pty Limited" at 30: Pty and Limited outvoted
+# Procurement. It counts matches now, so padding cannot dilute a real one.
+padded = score("Procurement Analyst JBS Australia Pty Limited Group Holdings")
+plain = score("Procurement Analyst")
+check("the employer's name cannot dilute a real match", padded >= plain - 5,
+      (padded, plain))
+
+check("two rungs up is marked down",
+      score("Director of Procurement Analytics") < score("Procurement Analytics"),
+      (score("Director of Procurement Analytics"), score("Procurement Analytics")))
+check("and a step down is too",
+      score("Graduate Data Analyst") < score("Data Analyst"))
+check("the wrong continent costs it",
+      score("Data Analyst", "Melbourne, VIC") < score("Data Analyst", "Mumbai, India"))
+check("remote does not", score("Data Analyst", "Remote") == score("Data Analyst", "Mumbai, India"))
+check("it never leaves 0 to 100",
+      0 <= score("Director Graduate Nurse", "Reykjavik") <= 100)
+
+check("bands split where they say they do",
+      (inbox.band(75), inbox.band(45), inbox.band(20)) == ("green", "amber", "red"))
+
 print(f"\n{passed} passed, {failed} failed")
 raise SystemExit(1 if failed else 0)

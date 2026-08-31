@@ -155,7 +155,11 @@ with TestClient(app) as client:
     r = client.get("/job/writer")
     forms = r.text.count('action="/job/writer/analyse"')
     check("there are two ways in, each with its own button", forms == 2, forms)
-    buttons = r.text.count('type="submit"')
+    # Counted within the two analyse forms, not across the page. The packages table
+    # below them now carries a Clear button per row, and a page-wide count made this
+    # assertion fail for a reason that had nothing to do with the analyse screen.
+    top = r.text.split("Earlier packages")[0]
+    buttons = top.count('type="submit"')
     check("and each has exactly one submit", buttons == 2, buttons)
     check("the link form submits on its own", 'id="urlGo"' in r.text)
     check("no rule about which input wins is needed any more",

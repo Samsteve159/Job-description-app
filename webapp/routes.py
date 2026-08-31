@@ -26,7 +26,8 @@ from sqlalchemy.orm import Session
 
 from config import config
 from database.db import get_db
-from database.models import GeneratedBlock, Package, ProfileFact
+from database.models import (DismissedAlert, GeneratedBlock, Package,
+                             ProfileFact)
 from modules import cover, fit, gaps, tracker
 from modules import contact as contact_module
 from modules import intake
@@ -79,7 +80,7 @@ def dashboard(request: Request, db: Session = Depends(get_db)):
     """The landing screen. Numbers first, drafts underneath."""
     return render(request, "dashboard.html", section="dashboard", _db=db,
                   stats=tracker.stats(db), gmail_ready=False,
-                  packages=db.query(Package).order_by(
+                  packages=db.query(Package).filter(Package.status != "deleted").order_by(
                       Package.created_at.desc()).limit(8).all())
 
 
@@ -143,7 +144,7 @@ def tracker_remove(db: Session = Depends(get_db), application_id: int = Form(...
 
 @router.get("/job/writer")
 def writer_form(request: Request, db: Session = Depends(get_db), error: str = ""):
-    packages = db.query(Package).order_by(Package.created_at.desc()).limit(12).all()
+    packages = db.query(Package).filter(Package.status != "deleted").order_by(Package.created_at.desc()).limit(10).all()
     return render(request, "writer.html", section="writer", _db=db,
                   packages=packages, error=error or None)
 
@@ -163,14 +164,14 @@ def analyse(request: Request, db: Session = Depends(get_db),
             return render(request, "writer.html", section="writer", url=url,
                           error=str(exc), error_title="Could not fetch that job",
                           error_hint="Most job sites are fine. The big boards are not.",
-                          packages=db.query(Package).order_by(
-                              Package.created_at.desc()).limit(12).all())
+                          packages=db.query(Package).filter(Package.status != "deleted").order_by(
+                              Package.created_at.desc()).limit(10).all())
     if not text:
         return render(request, "writer.html", section="writer", url=url,
                       error="Give it a job URL or paste the description.",
                       error_title="Nothing to analyse",
-                      packages=db.query(Package).order_by(
-                          Package.created_at.desc()).limit(12).all())
+                      packages=db.query(Package).filter(Package.status != "deleted").order_by(
+                          Package.created_at.desc()).limit(10).all())
 
     # The same posting must give the same keywords every time. Without this, closing a
     # gap and analysing again could move the score for reasons that have nothing to do
@@ -194,8 +195,8 @@ def analyse(request: Request, db: Session = Depends(get_db),
         return render(request, "writer.html", section="writer", url=url, job_text=text,
                       error=f"Could not read that as a job description: {exc}",
                       error_title="That did not read as a job",
-                      packages=db.query(Package).order_by(
-                          Package.created_at.desc()).limit(12).all())
+                      packages=db.query(Package).filter(Package.status != "deleted").order_by(
+                          Package.created_at.desc()).limit(10).all())
 
     facts = db.query(ProfileFact).order_by(ProfileFact.order_index).all()
     if not facts:
@@ -212,8 +213,8 @@ def analyse(request: Request, db: Session = Depends(get_db),
         return render(request, "writer.html", section="writer", url=url, job_text=text,
                       error=f"The tailor stage failed: {exc}",
                       error_title="The writer stage failed",
-                      packages=db.query(Package).order_by(
-                          Package.created_at.desc()).limit(12).all())
+                      packages=db.query(Package).filter(Package.status != "deleted").order_by(
+                          Package.created_at.desc()).limit(10).all())
 
     package = Package(
         job_text=text,
@@ -418,6 +419,22 @@ def _build(request: Request, db: Session, package: Package):
     if report.passed:
         message = f"Resume built and cleared the check at {report.score}/100."
     return _package_view(request, db, package, report=report, message=message)
+
+
+@router.post("/job/writer/{package_id}/remove")
+def package_remove(package_id: int, db: Session = Depends(get_db)):
+    """Soft delete, and the built files go with it. Nothing here is hard deleted."""
+    package = db.get(Package, package_id)
+    if package is not None:
+        for path in (package.resume_path, package.cover_path):
+            if path:
+                _drop_file(path)
+        package.status = "deleted"
+        package.resume_path = None
+        package.cover_path = None
+        db.commit()
+        log.info("package %d removed from the list", package_id)
+    return RedirectResponse("/job/writer", status_code=303)
 
 
 @router.get("/job/writer/{package_id}/download")
@@ -788,11 +805,53 @@ def alerts(request: Request, db: Session = Depends(get_db), days: int = 7):
         listings = inbox.scan(days=days)
     except Exception as exc:  # noqa: BLE001 - a dead token must not be a stack trace
         return render(request, "alerts.html", section="alerts", listings=[], days=days,
-                      error=f"Could not read your inbox: {exc}",
+                      rows=[], error=f"Could not read your inbox: {exc}",
                       error_title="Gmail did not answer")
 
-    return render(request, "alerts.html", section="alerts", days=days,
-                  listings=listings, off_target=inbox.off_target(listings))
+    cleared = {row.key for row in db.query(DismissedAlert).all()}
+    listings = [l for l in listings if l.key not in cleared]
+    facts = db.query(ProfileFact).all()
+
+    # Sorted by relevance, not by date. A feed ordered by arrival makes him read all of
+    # it to find the two worth opening.
+    rows = sorted(
+        ({"listing": l, "score": inbox.relevance(l, facts)} for l in listings),
+        key=lambda r: r["score"], reverse=True)
+    for row in rows:
+        row["band"] = inbox.band(row["score"])
+
+    return render(request, "alerts.html", section="alerts", days=days, rows=rows,
+                  listings=listings, off_target=inbox.off_target(listings),
+                  cleared_count=len(cleared))
+
+
+@router.post("/job/alerts/clear")
+def alerts_clear(db: Session = Depends(get_db), key: List[str] = Form(default=[]),
+                 label: List[str] = Form(default=[])):
+    """Clear one row, or the lot. Keys are kept so a mistake can be undone."""
+    from modules import inbox
+
+    keys = [k for k in key if k.strip()]
+    if not keys:
+        return RedirectResponse("/job/alerts", status_code=303)
+
+    known = {row.key for row in db.query(DismissedAlert).all()}
+    for index, k in enumerate(keys):
+        if k in known:
+            continue
+        db.add(DismissedAlert(key=k, label=label[index] if index < len(label) else None))
+    db.commit()
+    log.info("alerts: cleared %d row(s)", len(keys))
+    return RedirectResponse("/job/alerts", status_code=303)
+
+
+@router.post("/job/alerts/restore")
+def alerts_restore(db: Session = Depends(get_db)):
+    """Put everything back. Clearing eighteen rows by accident should cost one click."""
+    count = db.query(DismissedAlert).delete()
+    db.commit()
+    log.info("alerts: restored %d cleared row(s)", count)
+    return RedirectResponse("/job/alerts", status_code=303)
 
 
 @router.get("/job/brief")

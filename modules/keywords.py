@@ -77,6 +77,9 @@ _EQUIVALENTS: List[Set[str]] = [
     {"process", "processes"},
     {"requirement", "requirements"},
     {"metric", "metrics"},
+    {"consulting", "consultant", "consultancy", "consultants"},
+    {"engineering", "engineer", "engineers"},
+    {"specialist", "specialists"},
 ]
 
 _CANON: Dict[str, str] = {}

@@ -64,7 +64,12 @@
         </td>
         <td><span class="badge section">{{ p.status }}</span></td>
         <td style="color: var(--muted);">{{ p.created_at.strftime('%d %b, %H:%M') }}</td>
-        <td style="text-align: right;"><a href="/job/writer/{{ p.id }}">Open</a></td>
+        <td style="text-align: right; white-space: nowrap;">
+          <a href="/job/writer/{{ p.id }}">Open</a>
+          <form method="post" action="/job/writer/{{ p.id }}/remove" style="display: inline;">
+            <button type="submit" class="danger" style="margin-left: 8px;">Clear</button>
+          </form>
+        </td>
       </tr>
     {% endfor %}
     </tbody>
