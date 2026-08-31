@@ -83,5 +83,11 @@ else
 fi
 touch "$APP" "$DEST"
 
+# LaunchServices caches what it knows about a bundle, and copying files into one behind
+# its back leaves that cache stale. The symptom is a double-click that does nothing at
+# all: no window, no error, not even a line in the log, and `open` failing with -600.
+LSREG=/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister
+[ -x "$LSREG" ] && "$LSREG" -f "$DEST" 2>/dev/null && echo "re-registered with LaunchServices"
+
 echo "built:     $APP"
 echo "installed: $DEST"
