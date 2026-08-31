@@ -261,7 +261,9 @@
 {% for s in placement.suggestions %}
   <div class="panel">
     <div class="block-head" style="margin-bottom: 10px;">
-      <span class="badge {{ 'inferred' if s.closeability == 'likely' else ('section' if s.closeability == 'maybe' else 'blocked') }}">{{ s.closeability }}</span>
+      {% set label = {'likely': 'worth asking', 'maybe': 'possibly',
+                      'unlikely': 'nothing close on file'} %}
+      <span class="badge {{ 'inferred' if s.closeability == 'likely' else ('section' if s.closeability == 'maybe' else 'blocked') }}">{{ label.get(s.closeability, s.closeability) }}</span>
       <strong style="color: var(--ink); font-size: 15px;">{{ s.keyword }}</strong>
     </div>
 

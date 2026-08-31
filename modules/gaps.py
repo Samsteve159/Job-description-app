@@ -132,11 +132,19 @@ def suggest_one(keyword: str, facts: Sequence[Any], role: str = "") -> Suggestio
               for f in near]
 
     if grade == "unlikely":
+        # The old wording read "that is not a gap to close, it is a genuine part of the
+        # job you have not done", which is a claim about him that this function is in no
+        # position to make. It knows one thing: no fact on file is near the term. A
+        # record that never uses the word "insights" is not a person who has never
+        # produced one, and saying otherwise from a token search is both wrong and
+        # insulting. State the finding, and leave the conclusion to him.
         return Suggestion(
             keyword=keyword, closeability=grade, nearby=[],
             worth_asking=False,
-            honest_read=("Nothing in your record is near this. That is not a gap to "
-                         "close, it is a genuine part of the job you have not done."),
+            honest_read=("Nothing on file uses these words or anything close to them. "
+                         "Either it is genuinely outside what you have done, or you have "
+                         "done it and the record has never said so. Only you can tell "
+                         "which."),
         )
 
     listed = "\n".join(f"[{n['id']}] {n['text']}" for n in nearby) or "nothing close"

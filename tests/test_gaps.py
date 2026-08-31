@@ -84,7 +84,7 @@ print("\nrefusing to ask")
 s = gaps.suggest_one("kubernetes", FACTS)
 check("an unlikely term gets no question", s.question == "", s.question)
 check("and no draft to react to", s.draft == "", s.draft)
-check("it says so plainly instead", "not a gap to close" in s.honest_read, s.honest_read)
+check("it says what it found instead", "Nothing on file" in s.honest_read, s.honest_read)
 check("and is not marked worth asking", not s.worth_asking)
 check("no model call is made for it", s.nearby == [], s.nearby)
 
@@ -150,6 +150,20 @@ except ValueError:
     pass
 check("a refused write leaves the file untouched",
       tmp.read_text(encoding="utf-8") == before)
+
+print("\nwhat it says when nothing is close")
+# It said "that is not a gap to close, it is a genuine part of the job you have not
+# done". From a token search over a text field, that is a claim about the person it has
+# no standing to make. His record contains the word "insights" zero times; he has spent
+# ten years producing them.
+s = gaps.suggest_one("quantum cryptography", FACTS, role="Analyst")
+check("it is still not worth asking about", not s.worth_asking)
+check("it states what it found, not what he has done",
+      "Nothing on file" in s.honest_read, s.honest_read)
+check("it allows that the record may simply be silent",
+      "record has never said so" in s.honest_read, s.honest_read)
+check("and it does not tell him what he has not done",
+      "you have not done" not in s.honest_read, s.honest_read)
 
 print(f"\n{passed} passed, {failed} failed")
 raise SystemExit(1 if failed else 0)
