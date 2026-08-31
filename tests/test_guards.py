@@ -175,5 +175,25 @@ check("unaccepted inferred bullet excluded", "An unaccepted reframing." not in b
 check("name and contact pulled from facts",
       payload.name == "Sameer Iyer" and payload.contact == ["a@b.com"])
 
+print("\nwhen the model returns no job title")
+# A real Marsh posting came back with an empty title. That costs three visible things:
+# the title line under his name, which an ATS weights, the export filename, and the role
+# the fit score reports against. The posting names the job somewhere regardless.
+from modules.extract import title_from_text  # noqa: E402
+
+check("a labelled title line is read",
+      title_from_text("Job Title: Lead Analyst, Treasury Risk\nLocation: Mumbai")
+      == "Lead Analyst, Treasury Risk",
+      title_from_text("Job Title: Lead Analyst, Treasury Risk\nLocation: Mumbai"))
+check("a heading at the top is read",
+      title_from_text("Manager, Procurement Analytics\nMumbai, hybrid. A GCC.")
+      == "Manager, Procurement Analytics")
+check("hiring language is read",
+      title_from_text("We are hiring a Senior Data Analyst to support the UK business.")
+      == "Senior Data Analyst")
+check("it invents nothing when the posting names no role",
+      title_from_text("Some prose with no role in it at all whatsoever.") == "")
+check("and nothing from an empty posting", title_from_text("") == "")
+
 print(f"\n{passed} passed, {failed} failed")
 raise SystemExit(1 if failed else 0)

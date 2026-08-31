@@ -51,6 +51,40 @@ Rules:
   error page rather than a job description, return {"error": "not a job description"}."""
 
 
+# A posting always names the role somewhere, even when the model hands back an empty
+# title. The Marsh posting did exactly that, and an empty title costs three visible
+# things: the headline under his name, the export filename, and the line the fit score
+# reports against. Worth one regex rather than a re-ask.
+_TITLE_LINE = re.compile(
+    r"^(?:job\s*title|position|role|title)\s*[:\-]\s*(.{3,70})$", re.I | re.M)
+_SEEKING = re.compile(
+    r"\b(?:hiring|seeking|looking for|recruiting)\s+(?:an?\s+)?"
+    r"((?:[A-Z][\w&/.-]*(?:\s+|,\s*)){1,5}(?:Analyst|Manager|Lead|Director|Engineer|"
+    r"Specialist|Consultant|Associate|Officer|Head|Partner|Advisor|Executive))")
+
+
+def title_from_text(jd_text: str) -> str:
+    """Best effort at the role name when the model returns none."""
+    text = jd_text or ""
+    match = _TITLE_LINE.search(text)
+    if match:
+        return " ".join(match.group(1).split()).strip(" .-")
+
+    match = _SEEKING.search(text)
+    if match:
+        return " ".join(match.group(1).split()).strip(" ,.-")
+
+    # Failing that, the first short line that reads like a heading rather than a sentence.
+    for line in text.splitlines()[:12]:
+        line = " ".join(line.split())
+        if 6 <= len(line) <= 70 and "." not in line and any(c.islower() for c in line):
+            if re.search(r"\b(analyst|manager|lead|director|engineer|specialist|"
+                         r"consultant|associate|officer|head|advisor|executive)\b",
+                         line, re.I):
+                return line
+    return ""
+
+
 @dataclass
 class Requirement:
     text: str
@@ -189,7 +223,7 @@ def extract(jd_text: str) -> Extraction:
         if isinstance(keywords, list) else []
 
     result = Extraction(
-        title=str(data.get("title") or "").strip(),
+        title=(str(data.get("title") or "").strip() or title_from_text(jd_text)),
         company=(str(data["company"]).strip() if data.get("company") else None),
         location=(str(data["location"]).strip() if data.get("location") else None),
         seniority=_one_of(data.get("seniority"), SENIORITIES, "unknown"),

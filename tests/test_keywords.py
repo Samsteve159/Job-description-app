@@ -224,7 +224,7 @@ print("\nsoft skills are not search terms")
 # be evidenced from a career record, so all three sat in the denominator pushing the
 # score down and then appeared under "genuine gaps", which read as the app announcing
 # that a data analyst cannot solve problems or juggle priorities.
-for soft in ("problem solving", "multitasking", "analytical skills",
+for soft in ("problem solving", "multitasking", "analytical skills", "presentation",
              "attention to detail", "strong communication skills",
              "ability to work in a fast paced environment", "excellent interpersonal skills",
              "adaptability", "teamwork", "positive attitude", "commercial acumen"):

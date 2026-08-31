@@ -406,6 +406,7 @@ _NOT_A_KEYWORD_WORDS = (
     "attitude", "drive", "passion", "curiosity", "diligence", "rigour", "rigor",
     "acumen", "aptitude", "proficiency", "competency", "competencies", "capability",
     "detail", "details", "mindsets", "environment", "pace",
+    "presentation", "presentations",
 )
 
 # Canonicalised, because that is what the head noun is compared against. Spelled plural
