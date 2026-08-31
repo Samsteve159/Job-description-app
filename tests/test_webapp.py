@@ -172,9 +172,13 @@ with TestClient(app) as client:
     check("the stages named are the real ones",
           "cites a fact" in r.text and "Scoring the fit" in r.text)
     check("and it gives up rather than animating forever",
-          "took longer than it should have" in r.text and "120000" in r.text)
-    check("giving up tells him nothing was half-saved",
-          "nothing is half-written" in r.text)
+          "Giving up on this one" in r.text and "300000" in r.text)
+    # It used to give up at 120s while two model calls were still legitimately running,
+    # and told him to check a terminal that a desktop app does not have.
+    check("it waits longer than the two model calls it is waiting on",
+          "120000" not in r.text and "Check the terminal" not in r.text)
+    check("giving up says what to actually do about it",
+          "Quit Job App from the Dock" in r.text and "JobApp.log" in r.text)
     css = client.get("/static/app.css").text
     check("the skeleton has styles to match", ".sk-line" in css and "sk-sweep" in css)
     check("and it stops moving if the viewer asked for less motion",

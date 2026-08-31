@@ -167,16 +167,23 @@
     // nothing left to fall back to and it animates forever. Found the honest way: the
     // server had died and this sat there looking busy. A stuck screen that claims to be
     // working is worse than an error.
+    // Two model calls, each allowed 120s of its own, so this only fires when something
+    // is genuinely dead rather than merely slow. The old 120s window gave up on runs
+    // that were still working, and told him to check a terminal a desktop app does not
+    // have.
     setTimeout(function () {
       clearInterval(ticker);
       var main = document.querySelector("main");
       main.innerHTML =
-        '<div class="notice bad"><strong>That took longer than it should have.</strong>' +
-        '<p style="margin: 6px 0 0;">Either a model call is hanging or the app is not ' +
-        'running. Check the terminal you started it from, then try again. Nothing was ' +
-        'saved, so nothing is half-written.</p></div>' +
+        '<div class="notice bad"><strong>Giving up on this one.</strong>' +
+        '<p style="margin: 6px 0 0;">Five minutes without an answer means a model call ' +
+        'is stuck or the app has stopped. Quit Job App from the Dock, open it again, ' +
+        'and paste the job once more.</p>' +
+        '<p style="margin: 6px 0 0;">It may still finish in the background. Check the ' +
+        'recent list on the form before redoing the work. If this keeps happening, the ' +
+        'reason is in Library/Logs/JobApp.log</p></div>' +
         '<div class="actions"><a class="button" href="/job/writer">Back to the form</a></div>';
-    }, 120000);
+    }, 300000);
   }
 </script>
 {% endblock %}
