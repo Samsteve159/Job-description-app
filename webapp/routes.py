@@ -19,7 +19,7 @@ from datetime import date
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Depends, Form, Request
+from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
 from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
@@ -29,6 +29,7 @@ from database.db import get_db
 from database.models import GeneratedBlock, Package, ProfileFact
 from modules import cover, fit, gaps, tracker
 from modules import contact as contact_module
+from modules import intake
 from modules.ats import AtsBlocked, check as ats_check
 from modules.extract import Extraction, NotAJobDescription, extract
 from modules.fetch_jd import FetchError, clean, fetch
@@ -688,14 +689,64 @@ def gaps_save(request: Request, package_id: int, db: Session = Depends(get_db),
 @router.get("/job/details")
 def details(request: Request, db: Session = Depends(get_db),
             error: str = "", message: str = ""):
+    return _details_view(request, db, error=error, message=message)
+
+
+def _details_view(request: Request, db: Session, **kw):
     contact_module.bootstrap(db)
-    return render(request, "details.html", section="details", _db=db,
-                  details=contact_module.all_details(db),
-                  name=contact_module.display_name(db),
-                  lines=contact_module.resume_lines(db),
-                  warnings=contact_module.warnings(db),
-                  kinds=("name",) + contact_module.KINDS,
-                  error=error or None, message=message or None)
+    context = dict(
+        details=contact_module.all_details(db),
+        name=contact_module.display_name(db),
+        lines=contact_module.resume_lines(db),
+        warnings=contact_module.warnings(db),
+        kinds=("name",) + contact_module.KINDS,
+        fact_count=db.query(ProfileFact).count(),
+    )
+    context.update({k: (v or None) for k, v in kw.items()})
+    return render(request, "details.html", section="details", _db=db, **context)
+
+
+@router.post("/job/details/import")
+async def details_import(request: Request, db: Session = Depends(get_db),
+                         upload: UploadFile = File(...)):
+    """Read a CV or notes file and show what it found. Nothing is saved on this step."""
+    suffix = Path(upload.filename or "").suffix.lower()
+    tmp = OUTPUT_DIR / f"_import{suffix or '.txt'}"
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    tmp.write_bytes(await upload.read())
+    try:
+        text = intake.read(tmp)
+        facts = db.query(ProfileFact).all()
+        proposals = intake.propose(text, facts)
+    except intake.UnreadableFile as exc:
+        return _details_view(request, db, error=str(exc),
+                             error_title="Could not read that file")
+    finally:
+        tmp.unlink(missing_ok=True)
+
+    if not proposals:
+        return _details_view(request, db,
+                             error="Nothing in there looked like a fact about your career.",
+                             error_title="Found nothing to add")
+    return _details_view(request, db, proposals=proposals,
+                         source_name=upload.filename or "your file")
+
+
+@router.post("/job/details/import/save")
+def details_import_save(request: Request, db: Session = Depends(get_db),
+                        text: List[str] = Form(default=[]),
+                        kind: List[str] = Form(default=[])):
+    """Write only the ticked lines. Verified, because he read them and ticked them."""
+    chosen = [intake.Candidate(text=value, kind=(kind[i] if i < len(kind) else "bullet"))
+              for i, value in enumerate(text) if value.strip()]
+    if not chosen:
+        return _details_view(request, db, error="Nothing was ticked, so nothing was added.",
+                             error_title="Nothing to add")
+    written = intake.accept(chosen, db=db)
+    return _details_view(
+        request, db,
+        message=f"Added {written} fact(s) to your record. Re-analyse a job and the "
+                f"writer can cite them straight away.")
 
 
 @router.post("/job/details/set")

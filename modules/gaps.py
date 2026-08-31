@@ -208,8 +208,14 @@ def add_fact(text: str, *, parent_org: Optional[str] = None, tags: Optional[List
     text = (text or "").strip()
     if not text:
         raise ValueError("a fact cannot be empty")
-    if len(text) < 12:
-        raise ValueError("that is too short to be a fact. Say what you did")
+    # The floor is there to stop a one-word answer to "what have you done", which is a
+    # claim with nothing in it. A skill is not that kind of statement: "SQL" and "Rust"
+    # are complete, and holding them to twelve characters refused the shortest true
+    # things on the page.
+    floor = 2 if kind in ("skill", "cert") else 12
+    if len(text) < floor:
+        raise ValueError("that is too short to be a fact. Say what you did"
+                         if floor > 2 else "a fact needs at least two characters")
 
     path = seed_file or SEED_FILE
     payload = json.loads(path.read_text(encoding="utf-8"))

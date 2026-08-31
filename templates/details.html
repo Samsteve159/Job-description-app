@@ -1,5 +1,58 @@
 {% extends "base.html" %}
-{% block title %}My Details{% endblock %}
+{% block title %}My Details
+<!-- ------------------------------------------------------------- import a file -->
+<div class="panel">
+  <h2 style="margin-top: 0;">Update your record from a file</h2>
+  <p class="hint" style="margin-top: 0;">
+    Drop in a CV, or a markdown file of notes, whenever you finish a project or a course.
+    It reads the file and shows you what it found. <strong>Nothing is saved until you tick
+    it</strong>, and every line it proposes is taken word for word from your file. Nothing
+    is rewritten, because a fact you did not write is a fact nobody checked.
+    You currently have {{ fact_count }} on record.
+  </p>
+
+  <form method="post" action="/job/details/import" enctype="multipart/form-data">
+    <div class="row" style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
+      <input type="file" name="upload" accept=".pdf,.md,.markdown,.txt" required>
+      <button type="submit">Read it</button>
+    </div>
+    <p class="hint">PDF, Markdown or plain text, up to 10MB. A scanned PDF is a picture of
+      words rather than words, so export from the original instead.</p>
+  </form>
+</div>
+
+{% if proposals %}
+<div class="panel">
+  <h2 style="margin-top: 0;">Found in {{ source_name }}</h2>
+  <p class="hint" style="margin-top: 0;">
+    Tick what is true and worth keeping. Anything already on record is unticked for you.
+  </p>
+  <form method="post" action="/job/details/import/save">
+    {% for c in proposals %}
+      <label class="block {{ '' if c.is_new else 'muted-block' }}"
+             style="display: flex; gap: 10px; align-items: flex-start; padding: 9px 0;
+                    border-bottom: 1px solid var(--rule);">
+        <input type="checkbox" name="text" value="{{ c.text }}"
+               {% if c.is_new %}checked{% endif %} style="margin-top: 4px;">
+        <span style="flex: 1;">
+          <span class="block-text">{{ c.text }}</span>
+          <span class="hint" style="display: block; margin-top: 2px;">{{ c.note }}</span>
+        </span>
+        <select name="kind" style="max-width: 140px;">
+          {% for k in ("bullet", "skill", "cert", "education") %}
+            <option value="{{ k }}" {% if c.kind == k %}selected{% endif %}>{{ k }}</option>
+          {% endfor %}
+        </select>
+      </label>
+    {% endfor %}
+    <div class="actions" style="margin-top: 14px;">
+      <button type="submit">Add the ticked ones</button>
+      <a class="button secondary" href="/job/details">Discard</a>
+    </div>
+  </form>
+</div>
+{% endif %}
+{% endblock %}
 {% block body %}
 <h1>My Details</h1>
 <p class="lead">
@@ -68,4 +121,57 @@
     </p>
   </form>
 </div>
+
+<!-- ------------------------------------------------------------- import a file -->
+<div class="panel">
+  <h2 style="margin-top: 0;">Update your record from a file</h2>
+  <p class="hint" style="margin-top: 0;">
+    Drop in a CV, or a markdown file of notes, whenever you finish a project or a course.
+    It reads the file and shows you what it found. <strong>Nothing is saved until you tick
+    it</strong>, and every line it proposes is taken word for word from your file. Nothing
+    is rewritten, because a fact you did not write is a fact nobody checked.
+    You currently have {{ fact_count }} on record.
+  </p>
+
+  <form method="post" action="/job/details/import" enctype="multipart/form-data">
+    <div class="row" style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
+      <input type="file" name="upload" accept=".pdf,.md,.markdown,.txt" required>
+      <button type="submit">Read it</button>
+    </div>
+    <p class="hint">PDF, Markdown or plain text, up to 10MB. A scanned PDF is a picture of
+      words rather than words, so export from the original instead.</p>
+  </form>
+</div>
+
+{% if proposals %}
+<div class="panel">
+  <h2 style="margin-top: 0;">Found in {{ source_name }}</h2>
+  <p class="hint" style="margin-top: 0;">
+    Tick what is true and worth keeping. Anything already on record is unticked for you.
+  </p>
+  <form method="post" action="/job/details/import/save">
+    {% for c in proposals %}
+      <label class="block {{ '' if c.is_new else 'muted-block' }}"
+             style="display: flex; gap: 10px; align-items: flex-start; padding: 9px 0;
+                    border-bottom: 1px solid var(--rule);">
+        <input type="checkbox" name="text" value="{{ c.text }}"
+               {% if c.is_new %}checked{% endif %} style="margin-top: 4px;">
+        <span style="flex: 1;">
+          <span class="block-text">{{ c.text }}</span>
+          <span class="hint" style="display: block; margin-top: 2px;">{{ c.note }}</span>
+        </span>
+        <select name="kind" style="max-width: 140px;">
+          {% for k in ("bullet", "skill", "cert", "education") %}
+            <option value="{{ k }}" {% if c.kind == k %}selected{% endif %}>{{ k }}</option>
+          {% endfor %}
+        </select>
+      </label>
+    {% endfor %}
+    <div class="actions" style="margin-top: 14px;">
+      <button type="submit">Add the ticked ones</button>
+      <a class="button secondary" href="/job/details">Discard</a>
+    </div>
+  </form>
+</div>
+{% endif %}
 {% endblock %}

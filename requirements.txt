@@ -11,3 +11,6 @@ apscheduler>=3.10
 # Gmail, read-only. Only needed for the application scan; nothing else imports these.
 google-auth-oauthlib>=1.2
 google-api-python-client>=2.140
+
+# Reading a CV or a notes file dropped into My Details. Import only.
+pypdf>=5.0
