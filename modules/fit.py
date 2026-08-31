@@ -134,6 +134,46 @@ def _seniority_gap(target: str, years: Optional[float]) -> int:
     return LADDER.index(target) - LADDER.index(his)
 
 
+# The parser's scorecard, from modules/ats.py. Everything except keyword coverage is
+# earned by the renderer: one column, no tables, a contact block at the top, standard
+# headings, dates in a shape a machine can read. Those 65 points are not in question by
+# the time a document exists, which is what makes the remaining 30 predictable.
+_ATS_STRUCTURAL = 65
+_ATS_MUST_WEIGHT = 30
+
+
+def _projection(must: Sequence[str], supported: Sequence[str],
+                report: Dict[str, Any]) -> str:
+    """What building it would score, and which choice of his moves the number."""
+    if not must:
+        return "not built yet. Nothing to measure coverage against"
+
+    pending = [e.get("keyword") for e in (report.get("added") or [])
+               if isinstance(e, dict) and e.get("grade") != "verified"]
+    pending = [k for k in pending if k]
+
+    covered = len(supported)
+    now = covered - len(pending)
+    total = len(must)
+
+    def points(hit: int) -> float:
+        return 20.0 * (_ATS_STRUCTURAL + _ATS_MUST_WEIGHT * (hit / total)) / 100.0
+
+    base = points(max(now, 0))
+    if not pending:
+        return (f"not built yet. On what is accepted it should score about "
+                f"{int(round(base))} of 20, with {covered} of {total} of their terms "
+                f"on the page")
+
+    full = points(covered)
+    gain = full - base
+    named = ", ".join(pending[:3]) + ("..." if len(pending) > 3 else "")
+    return (f"not built yet. About {int(round(base))} of 20 as things stand. Ticking the "
+            f"amber lines that carry {named} takes it to roughly {int(round(full))}, "
+            f"worth about {gain:.1f} points, because keyword coverage is 30% of what "
+            f"the parser scores")
+
+
 def assess(extraction: Any, placement: Any, facts: Sequence[Any],
            ats_report: Any = None, location: str = "") -> Fit:
     """Score one application. Every argument is optional except the first two."""
@@ -230,8 +270,14 @@ def assess(extraction: Any, placement: Any, facts: Sequence[Any],
         # denominator rather than handed a default. Awarding 14 of 20 for a document that
         # does not exist inflated every fresh score by the same fourteen points, which is
         # how a job needing product ownership he has never done came out green.
+        #
+        # Zero points, but not zero to say. "Build the resume and this counts" is a fact
+        # about the app rather than advice about the job, and the parser's arithmetic is
+        # known in advance: the structural half is earned by the renderer, and keyword
+        # coverage is the only part a decision of his moves. So project it, and name the
+        # decision.
         add(Component("Document survivability", 0.0, 0,
-                      "not built yet. Build the resume and this counts", good=True))
+                      _projection(must, supported, report), good=True))
     else:
         passed = getattr(ats_report, "passed", False)
         raw = float(getattr(ats_report, "score", 0))

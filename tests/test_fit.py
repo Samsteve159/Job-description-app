@@ -220,5 +220,36 @@ d = Fit(score=80, weakest="sql").as_dict()
 check("the verdict survives into the stored package",
       d["call"] == "Apply" and "sql" in d["because"] and d["weakest"] == "sql", d)
 
+print("\nsurvivability, before there is a document to measure")
+from modules.fit import _projection  # noqa: E402
+
+MUST = ["sql", "power bi", "unspsc taxonomy", "spend analytics", "fp&a", "supplier master data"]
+SUP = ["sql", "power bi", "unspsc taxonomy", "spend analytics", "fp&a"]
+PENDING = {"added": [{"keyword": "fp&a", "grade": "inferred"},
+                     {"keyword": "unspsc taxonomy", "grade": "inferred"}]}
+
+line = _projection(MUST, SUP, PENDING)
+check("it says what building it would score", "of 20" in line, line)
+check("it names the terms behind the amber lines",
+      "fp&a" in line and "unspsc taxonomy" in line, line)
+check("it quantifies what ticking them is worth", "points" in line, line)
+check("ticking can only help", "roughly 18" in line and "About 16" in line, line)
+
+settled = _projection(MUST, SUP, {"added": []})
+check("with nothing pending it recommends nothing",
+      "Ticking" not in settled and "5 of 6" in settled, settled)
+
+# The structural 65 is earned by the renderer, so even zero keyword coverage is not zero.
+none_hit = _projection(MUST, [], {"added": []})
+check("no coverage still scores the structural half", "13 of 20" in none_hit, none_hit)
+# 19, not 20. The last point is nice-to-have coverage, which the projection does not
+# assume, because promising a point it might not earn is the one direction this must
+# never err in.
+check("full must coverage stops short of the ceiling",
+      "19 of 20" in _projection(MUST, MUST, {"added": []}),
+      _projection(MUST, MUST, {"added": []}))
+check("no must-haves is said plainly, not divided by zero",
+      "Nothing to measure" in _projection([], [], {}))
+
 print(f"\n{passed} passed, {failed} failed")
 raise SystemExit(1 if failed else 0)
