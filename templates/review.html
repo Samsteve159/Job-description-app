@@ -134,10 +134,12 @@
   {% endif %}
 
   {% if placement.gaps %}
-  <h3 style="margin-top: 16px;">Genuine gaps</h3>
+  <h3 style="margin-top: 16px;">Not in your record yet</h3>
   <p class="hint" style="margin-top: 0;">
-    No fact supports these, so they stay off the page. If you have actually done one of
-    them and it is simply not written down, close the gap and it becomes citable.
+    The posting screens for these and nothing on file evidences them, so they stay off the
+    page rather than being claimed for you. <strong>This is a statement about the record,
+    not about you.</strong> Most of the time the answer is that you have done it and never
+    wrote it down. Say so once and it is citable on every job after this one.
   </p>
   <div class="pill-row">
     {% for term in placement.gaps %}<span class="pill miss">{{ term }}</span>{% endfor %}

@@ -262,5 +262,26 @@ check("and so does one that merely contains the name",
 check("with no company given, nothing extra is blocked", usable_keyword("acme", None))
 check("is_org_name says why", is_org_name("marsh", "Marsh") and not is_org_name("sql", "Marsh"))
 
+print("\nproduct names people write two ways")
+# A posting asked for "Chat GPT" against a record saying "ChatGPT". The word-level
+# equivalence map cannot join those: one is two tokens, the other is one, and no amount
+# of canonicalising a word settles a disagreement about where the space goes.
+for a, b in [("chat gpt", "chatgpt"), ("Chat-GPT", "chatgpt"),
+             ("power bi", "powerbi"), ("machine learning", "ml"),
+             ("large language models", "llm"), ("natural language processing", "nlp"),
+             ("sql server", "sqlserver"), ("co-pilot", "copilot")]:
+    check(f"{a!r} and {b!r} are the same term",
+          " ".join(significant(a)) == " ".join(significant(b)),
+          (significant(a), significant(b)))
+
+# It must join only what it is told to. Blindly closing spaces would make "data science"
+# and "datascience" agree, and also "power" and "bi" agree with things they should not.
+check("unrelated pairs are still different",
+      " ".join(significant("data quality")) != " ".join(significant("data management")))
+check("and a joined form does not swallow its neighbours",
+      "chatgpt" in significant("we use chat gpt daily")
+      and "daily" in significant("we use chat gpt daily"),
+      significant("we use chat gpt daily"))
+
 print(f"\n{passed} passed, {failed} failed")
 raise SystemExit(1 if failed else 0)

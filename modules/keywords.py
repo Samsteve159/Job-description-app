@@ -237,8 +237,35 @@ def canonical(word: str) -> str:
     return word
 
 
+# Product names people write two ways. The word-level equivalence map above cannot join
+# these, because "chat gpt" is two tokens and "chatgpt" is one, and no amount of
+# canonicalising a word fixes a disagreement about where the space goes. A posting asked
+# for "Chat GPT" against a record saying "ChatGPT" and the two never met.
+_JOINED = [
+    (re.compile(r"\bchat[\s-]*gpt\b"), "chatgpt"),
+    (re.compile(r"\bco[\s-]*pilot\b"), "copilot"),
+    (re.compile(r"\bgen[\s-]*ai\b"), "genai"),
+    (re.compile(r"\bpower[\s-]*bi\b"), "powerbi"),
+    (re.compile(r"\bpower[\s-]*query\b"), "powerquery"),
+    (re.compile(r"\bpower[\s-]*point\b"), "powerpoint"),
+    (re.compile(r"\bdata[\s-]*bricks\b"), "databricks"),
+    (re.compile(r"\bsql[\s-]*server\b"), "sqlserver"),
+    (re.compile(r"\bexcel[\s-]*vba\b"), "vba"),
+    (re.compile(r"\bmachine[\s-]*learning\b"), "ml"),
+    (re.compile(r"\blarge[\s-]*language[\s-]*models?\b"), "llm"),
+    (re.compile(r"\bllms\b"), "llm"),
+    (re.compile(r"\bnatural[\s-]*language[\s-]*processing\b"), "nlp"),
+]
+
+
+def _join_known(text: str) -> str:
+    for pattern, replacement in _JOINED:
+        text = pattern.sub(replacement, text)
+    return text
+
+
 def tokens(text: str) -> List[str]:
-    return [canonical(w) for w in _WORD.findall((text or "").lower())]
+    return [canonical(w) for w in _WORD.findall(_join_known((text or "").lower()))]
 
 
 def significant(text: str) -> List[str]:
