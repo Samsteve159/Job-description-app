@@ -30,14 +30,11 @@
         <span class="verdict-call">{{ fit.call }}</span>
         <span class="verdict-why">{{ fit.because }}</span>
       </div>
-      <h3 style="margin: 0 0 4px; font-size: 15px;">{{ fit.headline }}</h3>
-      <p class="hint" style="margin: 0;">
-        Counted from your record and this posting. No model decides this number, so it
-        does not change unless something real does.
-      </p>
-      {% for line in fit.advice %}
-        <p style="font-size: 14px; margin: 8px 0 0; color: var(--ink);">{{ line }}</p>
+      {% for line in fit.advice[:2] %}
+        <p style="font-size: 14px; margin: 6px 0 0; color: var(--ink);">{{ line }}</p>
       {% endfor %}
+      <p class="hint" style="margin: 8px 0 0;"
+         title="Counted from your record and this posting. No model decides it.">Counted, not judged.</p>
     </div>
   </div>
 

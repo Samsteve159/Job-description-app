@@ -179,7 +179,11 @@ check("claiming things nothing backs lowers the score",
 check("the penalty appears as its own line",
       any(c.name == "Claims nothing backs" for c in faked.components))
 check("and it warns regardless of the number",
-      any("does not support" in a for a in faked.advice), faked.advice)
+      any("nothing backs" in a for a in faked.advice), faked.advice)
+# The panel had four blocks saying the same thing four ways: a verdict, a headline that
+# repeated it, a note explaining the methodology, and the advice. Only two survive.
+check("advice stays short enough to read",
+      all(len(a) <= 90 for a in faked.advice), [len(a) for a in faked.advice])
 
 print("\nbands")
 check("a high score is green", fit.Fit(score=85).band == fit.GREEN)

@@ -433,6 +433,12 @@ _NOT_A_KEYWORD_WORDS = (
     "attitude", "drive", "passion", "curiosity", "diligence", "rigour", "rigor",
     "acumen", "aptitude", "proficiency", "competency", "competencies", "capability",
     "detail", "details", "mindsets", "environment", "pace",
+    # How often the work happens, not what the work is. A posting saying "monthly
+    # reporting" wants reporting; "monthly" on its own is a calendar, and it appeared as
+    # a must-have term his record supposedly could not evidence.
+    "monthly", "weekly", "daily", "quarterly", "annual", "annually", "yearly",
+    "periodic", "ongoing", "timely", "adhoc", "hoc", "regular", "routine",
+    "deadline", "deadlines", "cadence", "frequency",
     "presentation", "presentations", "solution", "solutions", "generation",
     "functional", "insight", "insights", "deliverable", "deliverables",
 )

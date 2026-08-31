@@ -61,8 +61,8 @@ class Component:
 # this invites deliberation, which is the thing it exists to save you.
 VERDICTS = {
     GREEN: ("Apply", "Your record covers what they screen on."),
-    AMBER: ("Your call", "Applicable, but you would be arguing for parts of it."),
-    RED: ("Skip it", "The gaps are in what the job is about, not the wording."),
+    AMBER: ("Your call", "You would be arguing for parts of it."),
+    RED: ("Skip it", "The gaps are in the job itself, not the wording."),
 }
 
 
@@ -90,12 +90,10 @@ class Fit:
         """One line, and it names the specific thing wherever there is one to name."""
         if self.weakest:
             if self.band == GREEN:
-                return (f"Strong overall, though nothing shows {self.weakest}. "
-                        f"Apply if you can speak to it.")
+                return f"Strong, but nothing shows {self.weakest}. Be ready for it."
             if self.band == AMBER:
-                return (f"Hinges on {self.weakest}, which your record does not show. "
-                        f"Worth it only if you can argue it.")
-            return f"Nothing shows {self.weakest}, and the posting leans on it hardest."
+                return f"Hinges on {self.weakest}, which is not on your record."
+            return f"Nothing shows {self.weakest}, which this posting leans on hardest."
         return VERDICTS[self.band][1]
 
     def as_dict(self) -> Dict[str, Any]:
@@ -357,18 +355,16 @@ def assess(extraction: Any, placement: Any, facts: Sequence[Any],
 
     if unbacked:
         fit.advice.append(
-            f"Nothing in your record evidences {', '.join(heavy_missing[:3])}. "
-            f"If you have actually done any of them, close the gap and this moves."
+            f"Not on record: {', '.join(heavy_missing[:3])}. Close a gap and this moves."
         )
     if unsupported:
         fit.advice.append(
-            "The draft is claiming things your record does not support. Fix that before "
-            "sending, whatever the score says."
+            "The draft claims things nothing backs. Fix before sending."
         )
     if ats_report is not None and not getattr(ats_report, "passed", True):
-        fit.advice.append("The resume will not clear the parser yet. See the ATS check.")
+        fit.advice.append("Will not clear the parser yet. See the ATS check.")
     if fit.band == RED and not unbacked:
-        fit.advice.append("Nothing here is fixable by writing. Spend the evening elsewhere.")
+        fit.advice.append("Not fixable by writing. Spend the evening elsewhere.")
 
     log.info("fit: %d/100 (%s) for %r", fit.score, fit.band,
              getattr(extraction, "title", "") or "this job")
