@@ -771,6 +771,30 @@ def details_visibility(request: Request, db: Session = Depends(get_db),
 
 # ------------------------------------------------------------- not built yet
 
+@router.get("/job/alerts")
+def alerts(request: Request, db: Session = Depends(get_db), days: int = 7):
+    """Jobs the boards emailed him. The scout, arriving by the only honest route."""
+    from modules import gmail, inbox
+
+    if not gmail.connected():
+        return render(request, "not_built.html", section="alerts",
+                      heading="Job Alerts",
+                      why="Set alerts on LinkedIn and Naukri and they will email you the "
+                          "listings. This reads them out of your inbox, which is the one "
+                          "way to get at those boards without scraping them.",
+                      blocked_on=["Gmail is not connected. Run "
+                                  "python3 scripts/gmail_auth.py"])
+    try:
+        listings = inbox.scan(days=days)
+    except Exception as exc:  # noqa: BLE001 - a dead token must not be a stack trace
+        return render(request, "alerts.html", section="alerts", listings=[], days=days,
+                      error=f"Could not read your inbox: {exc}",
+                      error_title="Gmail did not answer")
+
+    return render(request, "alerts.html", section="alerts", days=days,
+                  listings=listings, off_target=inbox.off_target(listings))
+
+
 @router.get("/job/brief")
 def brief(request: Request):
     return render(request, "not_built.html", section="brief",

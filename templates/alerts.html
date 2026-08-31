@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block body %}
+
+<h1>Job Alerts</h1>
+<p class="lead">
+  {{ listings|length }} job{{ '' if listings|length == 1 else 's' }} the boards emailed you
+  in the last {{ days }} days.
+</p>
+
+{% if off_target %}
+<div class="notice warn">
+  <strong>{{ off_target|length }} of these are outside India, the UAE and remote.</strong>
+  <p style="margin: 6px 0 0;">
+    LinkedIn knows where you live and keeps matching on it, whatever your alerts say. Fix
+    it at the source: on each saved search set the location explicitly, and check
+    <em>Jobs, Preferences, Open to work</em> names the cities you actually want.
+  </p>
+</div>
+{% endif %}
+
+{% if listings %}
+<div class="panel">
+  {% for l in listings %}
+    <div style="display: flex; gap: 14px; align-items: baseline; padding: 11px 0;
+                border-bottom: 1px solid var(--rule);">
+      <span class="badge section" style="flex: none;">{{ l.source }}</span>
+      <span style="flex: 1; min-width: 0;">
+        <span class="block-text">{{ l.label }}</span>
+        <span class="hint" style="display: block; margin-top: 2px;">
+          {{ l.location or 'location not given' }}
+          {%- if l.received %} &middot; {{ l.received.strftime('%d %b') }}{% endif %}
+        </span>
+      </span>
+      {% if l.url %}
+        <a class="button secondary" href="{{ l.url }}" target="_blank" rel="noopener">Open</a>
+      {% endif %}
+      <a class="button" href="/job/writer">Draft for this</a>
+    </div>
+  {% endfor %}
+</div>
+<p class="hint">
+  Those boards refuse automated fetches, so open the job, copy the description, and paste
+  it into the writer. The link is here so you never have to go looking.
+</p>
+{% else %}
+<div class="empty panel">
+  <p>Nothing yet. Set job alerts on LinkedIn and Naukri and they will start arriving.</p>
+</div>
+{% endif %}
+
+{% endblock %}

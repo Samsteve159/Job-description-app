@@ -35,6 +35,7 @@
     <div class="subnav-inner">
       <nav class="sections">
         <a href="/job" class="{{ 'active' if section == 'dashboard' }}">Dashboard</a>
+        <a href="/job/alerts" class="{{ 'active' if section == 'alerts' }}">Job Alerts</a>
         <a href="/job/writer" class="{{ 'active' if section == 'writer' }}">Resume &amp; Cover</a>
         <a href="/job/tracker" class="{{ 'active' if section == 'tracker' }}">Tracker{% if live_count %}<span class="count-label">{{ live_count }}</span>{% endif %}</a>
         <a href="/job/brief" class="{{ 'active' if section == 'brief' }} soon">Interview Brief</a>
