@@ -37,6 +37,13 @@ Either returning a hit means stop and fix before committing.
 Write the commit message as prose explaining the change and the reasoning. `git diff` already
 lists the files.
 
+## Replies
+
+**Keep them short.** Answer the question, say what changed, stop. No recaps of what he
+just asked, no summaries of work he watched happen, no bullet lists restating the same
+point three ways. If something needs a long explanation, that is a sign it needs a
+decision from him, so ask the one question instead of writing the essay.
+
 ## Scope boundary
 
 **This directory is the whole project.** Do not read from, write to, or reference anything

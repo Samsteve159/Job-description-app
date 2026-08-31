@@ -45,7 +45,7 @@ if ! ls "$ROOT" >/dev/null 2>&1; then
   choice=$(osascript <<'OSA' 2>/dev/null
 display alert "Job App needs permission" message "macOS is blocking Job App from reading its own folder on your Desktop.
 
-Open Settings, turn on Job App in the list, then open Job App again. You only do this once." buttons {"Not now", "Open Settings"} default button "Open Settings"
+In the window that opens, click the + button, choose Job App on your Desktop, and switch it on. Then open Job App again.\n\nYou only do this once." buttons {"Not now", "Open Settings"} default button "Open Settings"
 OSA
 )
   case "$choice" in
