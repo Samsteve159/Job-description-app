@@ -58,6 +58,26 @@ fi
 
 cd "$ROOT" || { alert "Job App" "Cannot enter its own folder."; exit 1; }
 
+# `open <url>` reuses whatever tab the browser last had. This is a desktop app, so it gets
+# its own window. Safari and Chrome each need asking in their own way; anything else falls
+# back to the ordinary open, which is still correct, just less tidy.
+open_dashboard() {
+  url="http://127.0.0.1:${PORT}/job"
+  browser="$(defaults read com.apple.LaunchServices/com.apple.launchservices.secure 2>/dev/null \
+             | awk '/LSHandlerURLScheme = https/{found=1} found && /LSHandlerRoleAll/{print; exit}' \
+             | sed 's/.*= "\(.*\)";/\1/')"
+  case "$browser" in
+    *safari*)
+      osascript -e "tell application \"Safari\"" \
+                -e "activate" \
+                -e "make new document with properties {URL:\"$url\"}" \
+                >/dev/null 2>&1 && return 0 ;;
+    *chrome*)
+      open -na "Google Chrome" --args --new-window "$url" >/dev/null 2>&1 && return 0 ;;
+  esac
+  open "$url"
+}
+
 PORT="$("$PY" - <<'PORTPY' 2>/dev/null
 import os, re, pathlib
 port = "8100"
@@ -79,7 +99,7 @@ listening() {
 # Already up, from an earlier launch or from run.command. Just bring the dashboard forward.
 if listening; then
   say "already listening, opening the browser only"
-  open "http://127.0.0.1:${PORT}/job"
+  open_dashboard
   exit 0
 fi
 
@@ -96,7 +116,7 @@ fi
 (
   for _ in $(seq 1 100); do
     if listening; then
-      open "http://127.0.0.1:${PORT}/job"
+      open_dashboard
       exit 0
     fi
     sleep 0.2
