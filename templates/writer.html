@@ -140,9 +140,16 @@
     });
   });
 
+  // The form must survive this. Replacing main.innerHTML while a submit is in flight
+  // removes the very form being submitted, and the browser abandons the navigation: no
+  // request is sent, the skeleton animates over nothing, and five minutes later the
+  // screen blames a model call that was never made. So main is hidden, never replaced,
+  // and the skeleton goes in beside it.
   function showSkeleton() {
     var main = document.querySelector("main");
-    main.innerHTML =
+    var panel = document.createElement("div");
+    panel.id = "analysing";
+    panel.innerHTML =
       '<h1>Analysing</h1>' +
       '<p class="lead" id="stage">' + STAGES[0] + '...</p>' +
       '<div class="panel"><div class="sk sk-line w60"></div>' +
@@ -155,6 +162,9 @@
       '<div class="panel"><div class="sk sk-line w50"></div><div class="sk sk-line"></div>' +
       '<div class="sk sk-line w95"></div><div class="sk sk-line w80"></div>' +
       '<div class="sk sk-line w60"></div></div>';
+
+    main.style.display = "none";
+    main.parentNode.insertBefore(panel, main);
 
     var index = 0;
     var ticker = setInterval(function () {
@@ -173,8 +183,7 @@
     // have.
     setTimeout(function () {
       clearInterval(ticker);
-      var main = document.querySelector("main");
-      main.innerHTML =
+      panel.innerHTML =
         '<div class="notice bad"><strong>Giving up on this one.</strong>' +
         '<p style="margin: 6px 0 0;">Five minutes without an answer means a model call ' +
         'is stuck or the app has stopped. Quit Job App from the Dock, open it again, ' +

@@ -179,6 +179,14 @@ with TestClient(app) as client:
           "120000" not in r.text and "Check the terminal" not in r.text)
     check("giving up says what to actually do about it",
           "Quit Job App from the Dock" in r.text and "JobApp.log" in r.text)
+    # The skeleton used to replace main.innerHTML on submit, which removed the form the
+    # browser was in the middle of submitting. The request was never sent at all, so the
+    # screen sat there and eventually blamed a model call that had never been made.
+    check("the skeleton never replaces the element holding the form",
+          "main.innerHTML =" not in r.text)
+    check("it hides main and inserts beside it instead",
+          'main.style.display = "none"' in r.text
+          and "insertBefore" in r.text)
     css = client.get("/static/app.css").text
     check("the skeleton has styles to match", ".sk-line" in css and "sk-sweep" in css)
     check("and it stops moving if the viewer asked for less motion",
