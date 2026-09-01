@@ -195,5 +195,47 @@ check("it invents nothing when the posting names no role",
       title_from_text("Some prose with no role in it at all whatsoever.") == "")
 check("and nothing from an empty posting", title_from_text("") == "")
 
+print("\nno job disappears from the document")
+# A real build came out with only the current employer on it. Tailor had written bullets
+# for one role, and to_payload dropped every role with no bullets, so Puma Energy and
+# HDFC Bank were deleted outright. Four years of banking and treasury became a hole the
+# reader fills in unfavourably, and unexplained gaps are a documented rejection trigger.
+from modules.tailor import _roles_block, to_payload, TailorResult, Block  # noqa: E402
+
+
+class R:
+    def __init__(self, i, org, text, kind="role", frm=None, to=None):
+        self.id, self.org, self.text, self.kind = i, org, text, kind
+        self.date_from, self.date_to = frm, to
+        self.order_index, self.tags, self.metrics = i, [], {}
+        self.verified = True
+
+
+ROLES = [R(1, "Now Co", "Analyst", frm="Dec 2023"),
+         R(2, "Then Co", "Treasury Analyst", frm="Apr 2018", to="Oct 2021"),
+         R(3, "Long Ago Co", "Assistant Manager", frm="Mar 2015", to="Mar 2018")]
+
+only_one = TailorResult(blocks=[
+    Block(section="experience", text="Did a thing worth 19.3M.", fact_ids=[1],
+          grade="verified", org="Now Co", accepted=True, order_index=0)])
+payload = to_payload(only_one, ROLES, contact=["a@b.com"], name="X")
+orgs = [role.org for role in payload.experience]
+check("every employer is on the page", orgs == ["Now Co", "Then Co", "Long Ago Co"], orgs)
+check("the one with bullets keeps them",
+      len(payload.experience[0].bullets) == 1)
+check("the ones without still carry their dates",
+      payload.experience[1].dates == "Apr 2018 - Oct 2021", payload.experience[1].dates)
+check("and say nothing rather than something invented",
+      payload.experience[1].bullets == [])
+
+block = _roles_block(ROLES)
+check("the model is told to cover every role", block.count("\n- ") == 2, block)
+# Sorting "Mar 2015" against "Dec 2023" as strings put March first, so the newest role
+# was asked for one bullet and the oldest six.
+check("newest first, by date and not by month name",
+      block.index("Now Co") < block.index("Then Co") < block.index("Long Ago Co"), block)
+check("and the current role carries the most",
+      "Write 6 bullets" in block.split("\n")[0], block.split("\n")[0])
+
 print(f"\n{passed} passed, {failed} failed")
 raise SystemExit(1 if failed else 0)

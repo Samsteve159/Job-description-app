@@ -348,6 +348,29 @@ def _coerce_bullets(raw: Any, org: str, known: Dict[int, Any]) -> List[Block]:
 
 # ------------------------------------------------------------------------------ public
 
+def _roles_block(facts: Sequence[Any]) -> str:
+    """Every employer, newest first, with how many bullets each is worth.
+
+    The counts follow the convention that relevance decays: the reader knows it, and a
+    uniform five bullets per role across fifteen years reads as padding.
+    """
+    # By date, not by string. Sorting "Mar 2015" against "Dec 2023" alphabetically put
+    # March first, so the newest role was given one bullet and the oldest six.
+    def started(fact: Any) -> int:
+        return _as_months(getattr(fact, "date_from", None), 0) or 0
+
+    roles = sorted((f for f in facts if getattr(f, "kind", "") == "role"),
+                   key=started, reverse=True)
+    wanted = (6, 4, 3)
+    lines = []
+    for index, role in enumerate(roles):
+        count = wanted[index] if index < len(wanted) else 1
+        dates = f"{role.date_from or '?'} to {role.date_to or 'Present'}"
+        lines.append(f"- {role.org} ({dates}): {role.text}. Write {count} bullet"
+                     f"{'' if count == 1 else 's'}.")
+    return "\n".join(lines) or "- none on record"
+
+
 def tailor(extraction: Any, facts: Sequence[Any],
            house_spec: str = "") -> TailorResult:
     """Produce graded blocks for one job. Nothing here trusts the model."""
@@ -384,6 +407,10 @@ def tailor(extraction: Any, facts: Sequence[Any],
         f"  {', '.join(extraction.must_keywords()) or 'none stated'}\n\n"
         f"OTHER KEYWORDS WORTH HITTING IF TRUE:\n"
         f"  {', '.join(extraction.keywords) or 'none'}\n\n"
+        f"ROLES. Write bullets for EVERY one of these, not only the most recent. A\n"
+        f"resume missing a job reads as a gap being hidden, and the reader assumes the\n"
+        f"worst case. Weight by recency: the current role carries the argument, older\n"
+        f"ones establish the arc.\n{_roles_block(citable)}\n\n"
         f"FACTS (cite these by the id in square brackets):\n{_facts_block(citable)}"
     )
 
@@ -523,8 +550,11 @@ def to_payload(
                 key=lambda b: b.order_index,
             )
         ]
-        if not bullets:
-            continue
+        # A role with no bullets still appears, with its title and dates. Dropping it
+        # deleted Puma Energy and HDFC Bank from a resume outright, which does not read
+        # as brevity: it reads as a four-year hole the reader fills in unfavourably.
+        # Title and dates only is a legitimate treatment for an older role. Silence is
+        # not.
         experience.append(Role(
             title=role.text,
             org=role.org or "",
