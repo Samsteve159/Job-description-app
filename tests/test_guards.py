@@ -237,5 +237,29 @@ check("newest first, by date and not by month name",
 check("and the current role carries the most",
       "Write 6 bullets" in block.split("\n")[0], block.split("\n")[0])
 
+print("\nthe order the reader actually reads")
+from modules.tailor import _has_study_gap, _relevance_of  # noqa: E402
+
+TERMS = ["sql", "power bi", "unspsc taxonomy"]
+check("a bullet carrying two of their terms outranks one carrying none",
+      _relevance_of("Built Power BI dashboards on SQL Server.", TERMS)
+      > _relevance_of("Wrote a memo.", TERMS))
+check("and one carrying none scores zero", _relevance_of("Wrote a memo.", TERMS) == 0)
+check("no terms means no opinion", _relevance_of("Anything at all.", []) == 0)
+
+# A study break reads as an unexplained gap for the first ten seconds if the degrees that
+# fill it are at the bottom of page two.
+class Role:
+    def __init__(self, frm, to=None):
+        self.date_from, self.date_to = frm, to
+
+check("a two-year break is noticed",
+      _has_study_gap([Role("Apr 2018", "Oct 2021"), Role("Dec 2023")]))
+check("back-to-back roles are not",
+      not _has_study_gap([Role("Mar 2015", "Mar 2018"), Role("Apr 2018", "Oct 2021")]))
+check("a month between roles is not a gap",
+      not _has_study_gap([Role("Mar 2015", "Mar 2018"), Role("Apr 2018")]))
+check("a single role cannot have one", not _has_study_gap([Role("Dec 2023")]))
+
 print(f"\n{passed} passed, {failed} failed")
 raise SystemExit(1 if failed else 0)

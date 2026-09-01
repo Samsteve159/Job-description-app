@@ -407,6 +407,24 @@ def tailor(extraction: Any, facts: Sequence[Any],
         f"  {', '.join(extraction.must_keywords()) or 'none stated'}\n\n"
         f"OTHER KEYWORDS WORTH HITTING IF TRUE:\n"
         f"  {', '.join(extraction.keywords) or 'none'}\n\n"
+        f"ANSWER THE CHECKLIST, NOT THE BRIEF. For each must-have above, decide which\n"
+        f"bullet is meant to satisfy it, and make that bullet say so in the posting's own\n"
+        f"words. A requirement with no bullet assigned to it is a failed screen. An\n"
+        f"outcome the reader admires does not answer a question they did not ask: a\n"
+        f"five-year value case is a fine result and no evidence at all of programme\n"
+        f"management.\n\n"
+        f"USE THEIR VOCABULARY WHERE THE WORK IS REAL. If the posting names a method or a\n"
+        f"metric, Lean, root cause, input and output metrics, cycle time, and he has\n"
+        f"actually done that thing under another name, describe it in theirs. This is\n"
+        f"where most of the value is. If he has not done it, leave the term out\n"
+        f"completely. Never carry a term he cannot back.\n\n"
+        f"FRAME FOR THE ROLE BEING APPLIED FOR. An analyst bullet describes a deliverable:\n"
+        f"built, analysed, automated. A manager bullet describes ownership of an outcome\n"
+        f"across people he does not manage: the scope owned, who was influenced, the\n"
+        f"metric and how far it moved, over what period. The same real work supports\n"
+        f"either. Only the framing differs, and the framing is what is being read. This\n"
+        f"NEVER means promoting him: he has no reports, and inventing scope is the one\n"
+        f"failure worse than a rejection.\n\n"
         f"ROLES. Write bullets for EVERY one of these, not only the most recent. A\n"
         f"resume missing a job reads as a gap being hidden, and the reader assumes the\n"
         f"worst case. Weight by recency: the current role carries the argument, older\n"
@@ -502,6 +520,38 @@ def tailor(extraction: Any, facts: Sequence[Any],
     return result
 
 
+def _has_study_gap(roles: Sequence[Any], months: int = 6) -> bool:
+    """Is there a break between roles long enough for a reader to notice?
+
+    Six months. Below that a reader assumes notice periods and a holiday; above it they
+    start filling the silence in themselves, and they fill it unfavourably. Where the
+    break is study, the education section explains it, but only if it is somewhere the
+    eye reaches before the doubt forms.
+    """
+    today = date.today().year * 12 + date.today().month - 1
+    spans = []
+    for role in roles:
+        start = _as_months(getattr(role, "date_from", None), today)
+        end = _as_months(getattr(role, "date_to", None), today)
+        if start is not None:
+            spans.append((start, end if end is not None else today))
+    spans.sort()
+    return any(spans[i + 1][0] - spans[i][1] >= months for i in range(len(spans) - 1))
+
+
+def _relevance_of(text: str, terms: Sequence[str]) -> int:
+    """How many of the job's own must-have terms one bullet carries."""
+    if not terms:
+        return 0
+    lowered = " ".join(keywords.tokens(text or ""))
+    hits = 0
+    for term in terms:
+        wanted = keywords.significant(term)
+        if wanted and " ".join(wanted) in lowered:
+            hits += 1
+    return hits
+
+
 def to_payload(
     result: TailorResult,
     facts: Sequence[Any],
@@ -509,12 +559,15 @@ def to_payload(
     contact: Optional[Sequence[str]] = None,
     name: Optional[str] = None,
     headline: Optional[str] = None,
+    wanted_terms: Optional[Sequence[str]] = None,
 ) -> ResumePayload:
     """Assemble accepted blocks plus verbatim facts into something renderable.
 
     Education, certifications and contact details are not tailored. They come straight from
     the facts, because rewording a degree gains nothing and risks everything.
     """
+    wanted_terms = list(wanted_terms or [])
+
     def usable(block: Block) -> bool:
         if block.grade == "blocked":
             return False
@@ -543,13 +596,15 @@ def to_payload(
 
     experience: List[Role] = []
     for role in roles:
-        bullets = [
-            b.text for b in sorted(
-                (b for b in result.blocks
-                 if b.section == "experience" and b.org == role.org and usable(b)),
-                key=lambda b: b.order_index,
-            )
-        ]
+        mine = [b for b in result.blocks
+                if b.section == "experience" and b.org == role.org and usable(b)]
+        # Ordered by how much of what this job screens on each bullet actually carries.
+        # A review found the two bullets mapping to the posting's own named priorities
+        # sitting third and fourth in a block of six, because the model had ordered them
+        # by dollar size. A reader gives the block seconds, and the first two lines are
+        # the ones that get read.
+        bullets = [b.text for b in sorted(
+            mine, key=lambda b: (-_relevance_of(b.text, wanted_terms), b.order_index))]
         # A role with no bullets still appears, with its title and dates. Dropping it
         # deleted Halcyon Energy and HDFC Bank from a resume outright, which does not read
         # as brevity: it reads as a four-year hole the reader fills in unfavourably.
@@ -584,6 +639,7 @@ def to_payload(
     return ResumePayload(
         name=name,
         headline=(headline or "").strip(),
+        education_first=_has_study_gap(roles),
         contact=contact,
         summary=summary,
         skills=skills,

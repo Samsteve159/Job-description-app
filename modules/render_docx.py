@@ -106,6 +106,8 @@ class ResumePayload:
     experience: List[Role] = field(default_factory=list)
     education: List[str] = field(default_factory=list)
     certifications: List[str] = field(default_factory=list)
+    # set when a study period accounts for a gap between roles
+    education_first: bool = False
 
 
 def export_name(name: str, title: str, package_id: Optional[int] = None,
@@ -234,6 +236,15 @@ def render_resume(payload: ResumePayload, out_path: Path) -> Path:
         _heading(doc, SECTION_HEADINGS["skills"])
         _line(doc, " | ".join(payload.skills))
 
+    # Education before experience when it accounts for a gap. A reader gives the top of
+    # the page about ten seconds, and a two-year hole between roles is read as
+    # unexplained for the whole of it if the two master's degrees that fill it are at the
+    # bottom of page two. Ordinarily experience leads, because it is what they are buying.
+    if payload.education_first and payload.education:
+        _heading(doc, SECTION_HEADINGS["education"])
+        for item in payload.education:
+            _line(doc, item)
+
     if payload.experience:
         _heading(doc, SECTION_HEADINGS["experience"])
         for role in payload.experience:
@@ -243,7 +254,7 @@ def render_resume(payload: ResumePayload, out_path: Path) -> Path:
             for bullet in role.bullets:
                 _bullet(doc, bullet)
 
-    if payload.education:
+    if payload.education and not payload.education_first:
         _heading(doc, SECTION_HEADINGS["education"])
         for item in payload.education:
             _line(doc, item)

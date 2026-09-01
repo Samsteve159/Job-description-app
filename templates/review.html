@@ -131,6 +131,18 @@
   {% endif %}
 
   {% if placement.gaps %}
+{% if placement.unanswered %}
+  <h3 style="margin-top: 16px;">On the skills line, but not in a bullet</h3>
+  <p class="hint" style="margin-top: 0;">
+    A screener checks the experience section against the requirement, so a term sitting in
+    a list proves nothing. These have no bullet standing behind them. Where the work is
+    real, rewrite a bullet to say so in the posting's own words.
+  </p>
+  <div class="pill-row">
+    {% for term in placement.unanswered %}<span class="pill">{{ term }}</span>{% endfor %}
+  </div>
+{% endif %}
+
   <h3 style="margin-top: 16px;">Not in your record yet</h3>
   <p class="hint" style="margin-top: 0;">
     The posting screens for these and nothing on file evidences them, so they stay off the

@@ -282,7 +282,16 @@ def _join_known(text: str) -> str:
 
 
 def tokens(text: str) -> List[str]:
-    return [canonical(w) for w in _WORD.findall(_join_known((text or "").lower()))]
+    # The dot is in the word pattern for node.js and 3.5, and it was also swallowing the
+    # full stop that ends a sentence. A fact reading "audited against UNSPSC taxonomy."
+    # tokenised its last word as "taxonomy." and matched nothing, so the term looked
+    # absent from a record that plainly contained it. Inner dots are kept.
+    out = []
+    for word in _WORD.findall(_join_known((text or "").lower())):
+        word = word.strip(".")
+        if word:
+            out.append(canonical(word))
+    return out
 
 
 def significant(text: str) -> List[str]:
@@ -339,6 +348,45 @@ def find_evidence(keyword: str, facts: Sequence[Any]) -> Optional[Evidence]:
     return best
 
 
+# How many placed skills may share any one significant word. Two is a phrase family;
+# three is the same idea taking three slots on the densest keyword surface in the
+# document, which an ATS does not reward and a human reads as gaming.
+MAX_SHARED_WORD = 2
+
+
+def _too_repetitive(keyword: str, added: Sequence[Any], current: Sequence[str]) -> bool:
+    """Would placing this make one word appear too often across the skills line?"""
+    wanted = set(significant(keyword))
+    if not wanted:
+        return True
+
+    counts: Dict[str, int] = {}
+    for placed in list(current) + [e.keyword for e in added]:
+        for word in set(significant(placed)):
+            counts[word] = counts.get(word, 0) + 1
+
+    return any(counts.get(word, 0) >= MAX_SHARED_WORD for word in wanted)
+
+
+def unanswered(must: Sequence[str], blocks: Sequence[Any]) -> List[str]:
+    """Must-haves that no experience bullet carries.
+
+    A term can be on the skills line and still be unanswered: a screener checks the
+    experience section against the requirement, and a word in a list proves nothing. This
+    reports the ones with no bullet behind them, which is a different question from
+    whether his record supports them at all.
+    """
+    written = " ".join(getattr(b, "text", "") or "" for b in blocks
+                       if getattr(b, "section", "") == "experience")
+    joined = " ".join(tokens(written))
+    out = []
+    for term in must:
+        wanted = significant(term)
+        if wanted and " ".join(wanted) not in joined:
+            out.append(term)
+    return out
+
+
 def place(existing_text: str, must: Sequence[str], nice: Sequence[str],
           facts: Sequence[Any], skills: Sequence[str] = ()) -> Placement:
     """Decide which missing keywords have earned a place on the page.
@@ -373,6 +421,9 @@ def place(existing_text: str, must: Sequence[str], nice: Sequence[str],
                 continue
 
             if len(current) + len(placement.added) >= MAX_SKILLS:
+                placement.dropped.append(keyword)
+                continue
+            if _too_repetitive(keyword, placement.added, current):
                 placement.dropped.append(keyword)
                 continue
             placement.added.append(evidence)
@@ -450,6 +501,7 @@ _NOT_A_KEYWORD_WORDS = (
     "attitude", "drive", "passion", "curiosity", "diligence", "rigour", "rigor",
     "acumen", "aptitude", "proficiency", "competency", "competencies", "capability",
     "detail", "details", "mindsets", "environment", "pace",
+
     # How often the work happens, not what the work is. A posting saying "monthly
     # reporting" wants reporting; "monthly" on its own is a calendar, and it appeared as
     # a must-have term his record supposedly could not evidence.
@@ -465,6 +517,34 @@ _NOT_A_KEYWORD_WORDS = (
 # skills" sailed through as a must-have keyword.
 _NOT_A_KEYWORD = {canonical(word) for word in _NOT_A_KEYWORD_WORDS} | set(
     _NOT_A_KEYWORD_WORDS)
+
+
+# Fine inside a phrase, meaningless on their own. "cost reduction" and "data quality"
+# name work; "cost" and "quality" name the benefit a posting is describing. Blocking
+# these as head nouns would have taken "data quality" and "process improvement" with
+# them, so they are refused only when the whole keyword is that single word.
+#
+# A real skills line came out reading "cost | bachelor | cost optimization | stakeholder
+# management | cost saving": a qualification, and one idea three times.
+# Established compounds that end in a word the head-noun rule refuses. Every operations
+# posting screens on process improvement, and "improvement" has to stay blocked as a head
+# because "measurement and continuous improvement" was a real extraction. An explicit
+# list is honest about the exception; loosening the rule to admit it was not.
+_ALWAYS_KEYWORD = {
+    "process improvement", "continuous improvement", "quality improvement",
+    "root cause analysis", "risk management", "change management",
+    "stakeholder management", "category management", "master data management",
+}
+
+_NOT_ALONE = {canonical(word) for word in (
+    # qualifications and seniority, which are gates rather than skills
+    "bachelor", "bachelors", "master", "masters", "mba", "phd", "diploma", "graduate",
+    "postgraduate", "undergraduate", "senior", "junior", "principal", "associate",
+    # bare nouns a posting uses to describe the point of the work
+    "cost", "costs", "value", "quality", "growth", "efficiency", "productivity",
+    "performance", "success", "impact", "outcome", "outcomes", "result", "results",
+    "process", "data", "business", "project", "program", "programme", "team",
+)}
 
 MAX_KEYWORD_WORDS = 3
 MAX_KEYWORD_CHARS = 42
@@ -511,6 +591,9 @@ def usable_keyword(keyword: str, company: Optional[str] = None) -> bool:
     keyword = (keyword or "").strip()
     if not keyword or len(keyword) > MAX_KEYWORD_CHARS:
         return False
+    if " ".join(significant(keyword)) in {" ".join(significant(k))
+                                          for k in _ALWAYS_KEYWORD}:
+        return True
     # "5+ years", "6+" and the like describe a requirement's size, not its subject
     if re.search(r"\d", keyword) and not re.search(r"[a-z]{3}", keyword.lower()):
         return False
@@ -525,6 +608,8 @@ def usable_keyword(keyword: str, company: Optional[str] = None) -> bool:
     # A single short token is fine: ai, ml, r and bi are all real search terms. It is
     # only the run of them that is noise.
     if len(words) > 1 and all(len(word) <= 2 for word in words):
+        return False
+    if len(words) == 1 and words[0] in _NOT_ALONE:
         return False
     # The head noun decides it. A real search term names a thing: a tool, a domain, a
     # role, a discipline. "liquidity risk management" and "product owner" end in a thing.

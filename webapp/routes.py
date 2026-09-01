@@ -32,6 +32,7 @@ from database.models import (DismissedAlert, GeneratedBlock, Package,
 from modules import cover, fit, gaps, tracker
 from modules import contact as contact_module
 from modules import design
+from modules import keywords as kwmod
 from modules import intake
 from modules.ats import AtsBlocked, check as ats_check
 from modules.extract import Extraction, NotAJobDescription, extract
@@ -311,7 +312,9 @@ def analyse(request: Request, db: Session = Depends(get_db),
         company=extraction.company,
         title=extraction.title,
         extraction=extraction.as_dict(),
-        placement=(result.placement.as_dict() if result.placement else {}),
+        placement=dict((result.placement.as_dict() if result.placement else {}),
+                       unanswered=kwmod.unanswered(extraction.must_keywords(),
+                                                   result.blocks)),
         fit=_score_fit(db, extraction, result.placement, None),
         status="draft",
     )
@@ -469,10 +472,20 @@ def _build(request: Request, db: Session, package: Package):
 
     facts = db.query(ProfileFact).order_by(ProfileFact.order_index).all()
     contact_module.bootstrap(db)
+    # The header claims what the bullets prove. Writing the posting's title under his
+    # name reads as aspirational when the body underneath describes a different job, and
+    # a screener checks the experience section rather than the header anyway. So it goes
+    # on only when the record is close enough to the role to carry it.
+    fit_now = package.fit or {}
+    seniority = next((c for c in fit_now.get("components", [])
+                      if c.get("name") == "Seniority"), None)
+    earned = not seniority or seniority.get("points", 0) >= 12
+
     payload = to_payload(result, facts,
                          contact=contact_module.resume_lines(db),
                          name=contact_module.display_name(db),
-                         headline=package.title or "")
+                         headline=(package.title or "") if earned else "",
+                         wanted_terms=extraction.must_keywords())
 
     if not payload.experience and not payload.summary:
         return _package_view(request, db, package,

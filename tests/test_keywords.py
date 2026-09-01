@@ -301,5 +301,74 @@ for real in ("ai architect", "procurement data", "regulatory reporting",
              "data visualisation", "dashboard automation", "vendor spend"):
     check(f"still a keyword: {real!r}", usable_keyword(real))
 
+print("\nthe skills line, after a review of a real one")
+# It came out reading: cost | bachelor | cost optimization | stakeholder management |
+# cost saving. A qualification, and one idea occupying three slots on the densest keyword
+# surface in the document. An ATS does not reward repetition and a human reads it as
+# gaming.
+for junk in ("bachelor", "bachelors", "masters", "mba", "senior", "graduate"):
+    check(f"a qualification is not a skill: {junk!r}", not usable_keyword(junk))
+for bare in ("cost", "value", "quality", "growth", "efficiency", "results", "data",
+             "process", "team", "performance"):
+    check(f"a bare benefit noun is not a skill: {bare!r}", not usable_keyword(bare))
+
+# The same words are fine inside a phrase that names actual work, and blocking them as
+# head nouns would have taken these with them.
+for real in ("cost reduction", "data quality", "process improvement", "value chain",
+             "performance management", "data analytics", "project management"):
+    check(f"but the phrase survives: {real!r}", usable_keyword(real))
+
+# Not "team leadership", and that is not an oversight. He works solo, headcount claims are
+# blocked at the gate, and a term he can never truthfully carry has no business inflating
+# the denominator his coverage is measured against.
+check("a term he could never claim is still refused", not usable_keyword("team leadership"))
+
+# "improvement" has to stay refused as a head, because "measurement and continuous
+# improvement" was a real extraction. The established compounds are listed explicitly
+# rather than the rule being loosened to admit them.
+check("the abstraction is still refused",
+      not usable_keyword("measurement and continuous improvement"))
+
+print("\nand one idea does not take three slots")
+from modules.keywords import _too_repetitive  # noqa: E402
+
+class Placed:
+    def __init__(self, keyword):
+        self.keyword = keyword
+
+check("a second term sharing a word is allowed",
+      not _too_repetitive("cost saving", [Placed("cost optimisation")], []))
+check("a third is not",
+      _too_repetitive("cost reduction", [Placed("cost optimisation")], ["cost saving"]))
+check("an unrelated term is unaffected",
+      not _too_repetitive("sql", [Placed("cost optimisation")], ["cost saving"]))
+
+print("\na full stop is not part of the word")
+from modules.keywords import tokens  # noqa: E402
+# "audited against UNSPSC taxonomy." tokenised its last word as "taxonomy." and matched
+# nothing, so a term looked absent from a record that plainly contained it. The dot is in
+# the word pattern for node.js and 3.5.
+check("a sentence-ending stop is stripped",
+      "taxonomies" in tokens("audited against UNSPSC taxonomy."),
+      tokens("audited against UNSPSC taxonomy."))
+check("and the term matches after it",
+      " ".join(significant("unspsc taxonomy")) in " ".join(tokens("against UNSPSC taxonomy.")))
+
+print("\nwhich requirements no bullet answers")
+from modules.keywords import unanswered  # noqa: E402
+
+class Blk:
+    def __init__(self, section, text):
+        self.section, self.text = section, text
+
+blocks = [Blk("experience", "Ran spend analysis in SQL against UNSPSC taxonomy."),
+          Blk("skills", "sql | power bi | supplier master data")]
+missing = unanswered(["sql", "power bi", "supplier master data", "unspsc taxonomy"], blocks)
+check("a term only on the skills line counts as unanswered",
+      "power bi" in missing and "supplier master data" in missing, missing)
+check("a term inside a bullet does not", "sql" not in missing and "unspsc taxonomy" not in missing,
+      missing)
+check("nothing wanted, nothing unanswered", unanswered([], blocks) == [])
+
 print(f"\n{passed} passed, {failed} failed")
 raise SystemExit(1 if failed else 0)
