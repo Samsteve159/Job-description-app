@@ -28,8 +28,8 @@ def fact(id, text, metrics=None, kind="bullet", **kw):
 
 
 KNOWN = {f.id: f for f in [
-    fact(12, "Scaled a $12.5M unmatched-spend finding into a ~$80M five-year value case.",
-         {"finding": "$12.5M", "value_case": "~$80M / 5 years"}),
+    fact(12, "Scaled a $12.5M unmatched-spend finding into a ~$40M five-year value case.",
+         {"finding": "$12.5M", "value_case": "~$40M / 5 years"}),
     fact(14, "Audits supplier categorisation across 98.4% of categorised spend.",
          {"coverage": "98.4% of categorised spend", "categories": "31 of 44"}),
     fact(20, "Built treasury dashboards used for regional reporting."),
@@ -62,7 +62,7 @@ print("\nnumber drift")
 b, reason = _validate(Block("experience", "Scaled a $22.5M unmatched-spend finding.", [12], "verified"), KNOWN)
 check("drifted money figure is blocked", reason is not None and b.grade == "blocked", reason)
 
-b, reason = _validate(Block("experience", "Scaled a $12.5M finding into a ~$80M case.", [12], "verified"), KNOWN)
+b, reason = _validate(Block("experience", "Scaled a $12.5M finding into a ~$40M case.", [12], "verified"), KNOWN)
 check("exact money figures pass", reason is None, reason)
 
 b, reason = _validate(Block("experience", "Coverage across 98.4% of categorised spend.", [14], "verified"), KNOWN)
@@ -113,7 +113,7 @@ for text, want in [
     ("10 years' experience in FP&A", [10.0]),
     ("5 years ago", []),
     ("a 3 year programme", []),
-    ("a ~$120M five-year value case", []),
+    ("a ~$60M five-year value case", []),
 ]:
     check(f"tenure read from {text[:34]!r}", _tenure_claims(text) == want, _tenure_claims(text))
 
@@ -156,7 +156,7 @@ except BlockedContentError as exc:
 
 print("\npayload assembly")
 facts = [
-    SimpleNamespace(id=1, kind="name", text="Sameer Iyer", org=None, order_index=0,
+    SimpleNamespace(id=1, kind="name", text="Jane Doe", org=None, order_index=0,
                     date_from=None, date_to=None, parent_id=None, tags=[], metrics={}, verified=True),
     SimpleNamespace(id=2, kind="contact", text="a@b.com", org=None, order_index=0,
                     date_from=None, date_to=None, parent_id=None, tags=[], metrics={}, verified=True),
@@ -173,7 +173,7 @@ bullets = payload.experience[0].bullets if payload.experience else []
 check("accepted inferred bullet included", "An accepted reframing." in bullets, bullets)
 check("unaccepted inferred bullet excluded", "An unaccepted reframing." not in bullets, bullets)
 check("name and contact pulled from facts",
-      payload.name == "Sameer Iyer" and payload.contact == ["a@b.com"])
+      payload.name == "Jane Doe" and payload.contact == ["a@b.com"])
 
 print("\nwhen the model returns no job title")
 # A real Marsh posting came back with an empty title. That costs three visible things:
@@ -197,7 +197,7 @@ check("and nothing from an empty posting", title_from_text("") == "")
 
 print("\nno job disappears from the document")
 # A real build came out with only the current employer on it. Tailor had written bullets
-# for one role, and to_payload dropped every role with no bullets, so Puma Energy and
+# for one role, and to_payload dropped every role with no bullets, so Halcyon Energy and
 # HDFC Bank were deleted outright. Four years of banking and treasury became a hole the
 # reader fills in unfavourably, and unexplained gaps are a documented rejection trigger.
 from modules.tailor import _roles_block, to_payload, TailorResult, Block  # noqa: E402
@@ -216,7 +216,7 @@ ROLES = [R(1, "Now Co", "Analyst", frm="Dec 2023"),
          R(3, "Long Ago Co", "Assistant Manager", frm="Mar 2015", to="Mar 2018")]
 
 only_one = TailorResult(blocks=[
-    Block(section="experience", text="Did a thing worth 19.3M.", fact_ids=[1],
+    Block(section="experience", text="Did a thing worth 4.5M.", fact_ids=[1],
           grade="verified", org="Now Co", accepted=True, order_index=0)])
 payload = to_payload(only_one, ROLES, contact=["a@b.com"], name="X")
 orgs = [role.org for role in payload.experience]

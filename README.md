@@ -33,7 +33,7 @@ Every generated block must cite the facts it drew on, by id, from a store you co
 | Check | What it stops |
 |---|---|
 | Citation validation | Fact ids that do not exist are stripped. A block left with no surviving citation is blocked |
-| Number validation | Every figure must appear in a cited fact. This is what stops `$19.3M` quietly becoming `$29.3M` |
+| Number validation | Every figure must appear in a cited fact. This is what stops `$4.5M` quietly becoming `$5.4M` |
 | Scope validation | Configurable claims you must never make, for example team leadership if you work solo |
 
 `modules/render_docx.py::gate` then refuses anything still graded `blocked`, and anything

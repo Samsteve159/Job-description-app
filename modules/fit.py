@@ -197,7 +197,7 @@ def assess(extraction: Any, placement: Any, facts: Sequence[Any],
     #
     # Counted against the FACTS, not against what the draft happens to say. The first
     # version of this counted `already_present`, meaning terms the model had typed, and
-    # scored the Wells Fargo posting 75 and green on a record with no risk, product or
+    # scored the Northwind Bank posting 75 and green on a record with no risk, product or
     # agile experience anywhere in it. That is the precise failure this app exists to
     # prevent, reintroduced by the thing meant to summarise it.
     supported = [term for term in must if kw.find_evidence(term, facts) is not None]
@@ -326,7 +326,7 @@ def assess(extraction: Any, placement: Any, facts: Sequence[Any],
     fit.score = max(0, min(100, int(round(100.0 * earned / possible - penalties))))
 
     # A high score with a heavy term missing is the interesting case, and the one a
-    # headline can most easily lie about. He can score green on the Wells Fargo posting
+    # headline can most easily lie about. He can score green on the Northwind Bank posting
     # by being strong on treasury and AI while having no product ownership at all, and
     # "your record covers what they asked for" would be false in the way that matters.
     heaviest = heavy_missing[0] if heavy_missing else None

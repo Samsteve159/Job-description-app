@@ -3,7 +3,7 @@
 The bake-off said keyword coverage swung 45 points between runs on every model tested,
 and the obvious reading was that models are inconsistent. The real reading, once the
 facts were checked, was worse: the high-coverage runs were the ones where the model
-invented more. The word "risk" appears in none of Sameer's 63 facts, and runs still
+invented more. The word "risk" appears in none of his 63 facts, and runs still
 produced "supporting liquidity risk management", citing a real fact id, passing every
 guard. Coverage was measuring fabrication and rewarding it.
 

@@ -34,7 +34,7 @@ class ContactDetail(Base):
     editable: seed_profile.py wipes and reloads ProfileFact because the JSON file is the
     source of truth for the career record. Contact details are the opposite. The app is
     the source of truth for them, so a re-seed must not be able to revert a phone number
-    Sameer changed last week. Different lifecycle, different table.
+    he changed it last week. Different lifecycle, different table.
 
     `renders` exists because not every detail belongs on the page. A full street address
     is worth storing for application forms and worth leaving off a resume, where city and
@@ -56,7 +56,7 @@ class ContactDetail(Base):
 # --------------------------------------------------------------- career source of truth
 
 class ProfileFact(Base):
-    """Every fact about Sameer's career, stored once.
+    """Every fact about his career, stored once.
 
     The tailor stage may only select and rephrase from these rows. Any generated block
     that cites no fact is blocked from rendering. This table is the reason the app can
@@ -70,7 +70,7 @@ class ProfileFact(Base):
     parent_id = Column(Integer, ForeignKey("profile_facts.id"), nullable=True)
     text = Column(Text, nullable=False)
     tags = Column(JSON, default=list)        # ["spend analytics", "sql", "ai"]
-    metrics = Column(JSON, default=dict)     # {"value": "19.3M", "currency": "AUD"}
+    metrics = Column(JSON, default=dict)     # {"value": "4.5M", "currency": "AUD"}
     # where this fact came from, so it can be re-verified later
     source = Column(String(128), nullable=True)
     # employer / institution context, for role and bullet rows
@@ -228,7 +228,7 @@ class Application(Base):
     """One job actually applied for, and what happened next.
 
     Deliberately separate from Package. A Package is something this app wrote; an
-    Application is something Sameer sent. Most applications will never have a Package
+    Application is something he sent. Most applications will never have a Package
     (Easy Apply, a form on a company site, a recruiter email) and a Package can exist for
     a job never applied to. Joining them into one row would force every real application
     to carry an empty resume record, and every draft to look like an application.

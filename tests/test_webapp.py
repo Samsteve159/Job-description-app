@@ -119,9 +119,9 @@ with TestClient(app) as client:
     check("the second module has a home", r.status_code == 200 and "Post Writer" in r.text)
 
     r = client.post("/job/tracker/add",
-                    data={"title": "Treasury Analyst", "company": "Wells Fargo",
+                    data={"title": "Treasury Analyst", "company": "Northwind Bank",
                           "source": "manual", "url": ""}, follow_redirects=True)
-    check("an application can be logged", "Wells Fargo" in r.text)
+    check("an application can be logged", "Northwind Bank" in r.text)
     r = client.get("/job")
     check("the dashboard counts it", ">1<" in r.text)
     check("the nav badge shows the live count", 'class="count-label"' in r.text)

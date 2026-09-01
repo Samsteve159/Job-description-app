@@ -41,7 +41,7 @@ print("what is not a job")
 # These outnumbered real listings in his actual inbox. A list that is mostly noise gets
 # ignored, which is the same as not having built it.
 for junk in ("13 people visited your profile", "You have 3 new messages",
-             "Sameer: your job alert for Consultant in India has been created",
+             "he: your job alert for Consultant in India has been created",
              "Congratulate Priya on her work anniversary",
              "Security alert: new sign-in"):
     check(f"noise: {junk[:44]!r}", is_noise(junk))

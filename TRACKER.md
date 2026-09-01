@@ -131,7 +131,7 @@ unsupervised.
 
 ### The result
 
-| | Wells Fargo, treasury and product owner | Procurement analytics, his actual field |
+| | a US bank, treasury and product owner | Procurement analytics, his actual field |
 |---|---|---|
 | Coverage | 43%, **0% spread over four runs** on a fixed extraction | 96%, 5 of 5 must-haves |
 | Genuine gaps | 6 | 0 |
@@ -145,7 +145,7 @@ reaching block never reaches the page, so counting its keywords scored an intent
 ## The denominator was moving too
 
 Fixing tailoring exposed the stage above it. `extract` classified must and nice itself,
-and produced **eighteen must-have requirements on one run of the Wells Fargo posting and
+and produced **eighteen must-have requirements on one run of one bank's posting and
 three on the next**. The ATS gate scores coverage against that set, so the denominator was
 changing between runs and a resume passed or failed on which reading the model took.
 
@@ -202,7 +202,7 @@ longer matches the choices behind it.
 
 ## Gap closer, and the direction the override runs in
 
-The truth gate stops a model inventing experience. It had also started stopping Sameer
+The truth gate stops a model inventing experience. It had also started stopping him
 recording true things about his own career: "risk" appears in none of his 63 facts, on the
 record of somebody who ran multi-banking treasury operations for three and a half years.
 
@@ -269,12 +269,12 @@ The second run said "10 years of experience". Computed figure is 9.8.
 - **Whether the gaps are real or the record is thin.** "risk" appearing in zero facts is
   suspicious for someone who ran treasury operations at an energy company. The likeliest
   reading is that `profile_facts.json` under-describes that work, not that he never did
-  it. Worth a pass through the Puma Energy entries. The app cannot fix this: adding risk
+  it. Worth a pass through the treasury role entries. The app cannot fix this: adding risk
   language it cannot evidence is exactly what it refuses to do
 
 ---
 
-## Blocked on Sameer
+## Blocked on him
 
 | | Blocks |
 |---|---|
@@ -301,7 +301,7 @@ Full rationale in `DECISIONS.md`. The ones most likely to be re-litigated:
   weights, claims adjacent skills with evidence. Per-job tweaking is the product
 - **`STRICT_NUMBERS` is a flag, default on.** Blocks figures not present in cited facts.
   Only fires on invented numbers. Set false in `.env` to disable
-- **No screening answer bank.** Dropped 27 Aug at Sameer's request. Notice period,
+- **No screening answer bank.** Dropped 27 Aug at his request. Notice period,
   expected CTC and why-India stay as facts he can cite; the app does not maintain a
   tailored answer for each. Cover letters were the other half of that slice and stay,
   since the section is called Resume and Cover
@@ -330,4 +330,4 @@ Full rationale in `DECISIONS.md`. The ones most likely to be re-litigated:
 | 26 Aug 2026 (night) | Gap closer built: asks about work the record does not cover, writes his answers back to the JSON. `extract` stopped deciding its own denominator. minimax-m3 dropped from every route, rate limited to 0 of 4. Tests 246 to 295 |
 | 26 Aug 2026 (evening) | Deterministic keyword placement. Spread went from 44% to 0%, and the fix uncovered that high coverage had been measuring fabrication. New guard for skill claims no fact supports. Tests 184 to 246 |
 | 26 Aug 2026 (later) | App shell: two modules, dashboard, tracker, modal errors, light and dark. `fetch_jd` done. Bake-off run, which found the variance is prompt-side not model-side. Tests 63 to 184 |
-| 26 Aug 2026 | First live run, Wells Fargo Lead Treasury Analyst JD. `scripts/run_job.py` added to drive the whole pipeline from one command. Two defects found and fixed: non-ASCII punctuation reaching the page, and tenure claims going unchecked. Tests 41 to 63 |
+| 26 Aug 2026 | First live run, a US bank's treasury posting. `scripts/run_job.py` added to drive the whole pipeline from one command. Two defects found and fixed: non-ASCII punctuation reaching the page, and tenure claims going unchecked. Tests 41 to 63 |

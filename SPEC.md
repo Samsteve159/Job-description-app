@@ -2,7 +2,7 @@
 
 ## What this is
 
-A desktop app on Sameer's Mac for running an India job search. Career history and generated
+A desktop app on his Mac for running an India job search. Career history and generated
 documents never leave the machine. The only outbound traffic is LLM API calls and, when he
 gives it a URL, one fetch of that job posting.
 

@@ -64,7 +64,7 @@ TASKS = {
         'Every bullet MUST cite at least one fact id from the FACTS given. Never invent a '
         'number. If you cannot cite a fact, omit the bullet.',
         f"""JOB:\n{JD}\n\nFACTS:
-[12] Scaled a $12.5M unmatched-spend finding into a ~$80M five-year value case.
+[12] Scaled a $12.5M unmatched-spend finding into a ~$40M five-year value case.
 [14] Audits supplier categorisation against UNSPSC across 98.4% of categorised spend.
 [20] Built treasury dashboards used for regional reporting.
 [31] Skill: SQL

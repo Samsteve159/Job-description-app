@@ -47,7 +47,7 @@ for url, want in [
     ("http://in.linkedin.com/jobs/2", True),
     ("naukri.com/job/456", True),
     ("https://www.glassdoor.com/job/1", True),
-    ("https://careers.wellsfargo.com/job/1", False),
+    ("https://careers.northwindbank.com/job/1", False),
     ("notlinkedin.com/x", False),
 ]:
     got = blocked_reason(url) is not None

@@ -618,7 +618,7 @@ def split_by_emphasis(jd_text: str, candidates: Sequence[str],
     """Decide must and nice from where a term sits in the posting, not from a model.
 
     `extract` classifies requirements itself, and it is not steady about it: the same
-    Wells Fargo posting produced eighteen must-have requirements on one run and three on
+    Northwind Bank posting produced eighteen must-have requirements on one run and three on
     the next. Since the ATS gate scores coverage against that set, its denominator was
     moving between runs and a resume passed or failed on which reading the model happened
     to take.
@@ -668,7 +668,7 @@ def weights(jd_text: str, title: str, terms: Sequence[str]) -> Dict[str, float]:
     """How much each term matters to this posting, from where and how often it appears.
 
     Counting must-have coverage as a flat fraction treats every term as equal, and they
-    are not. The Wells Fargo posting is titled "Lead Treasury Analyst, Product Owner - AI"
+    are not. The Northwind Bank posting is titled "Lead Treasury Analyst, Product Owner - AI"
     and lists "capital", "funding" and "liquidity" once each in a sentence. Scored flat,
     having eight of twelve looked like a good fit at 72 out of 100, when the four missing
     were product owner, agile, backlog and risk management: the entire product half of a
@@ -683,7 +683,7 @@ def weights(jd_text: str, title: str, terms: Sequence[str]) -> Dict[str, float]:
         if not wanted:
             continue
         # Damped, because repetition is evidence of emphasis and not a linear measure of
-        # it. "ai" appears twenty-one times in the Wells Fargo posting and "funding"
+        # it. "ai" appears twenty-one times in the Northwind Bank posting and "funding"
         # twice; undamped that made ai thirty times the term, which is not what a person
         # reading it would say. The square root keeps the ordering and loses the tyranny.
         weight = 1.0 + math.sqrt(_mentions(term, required))

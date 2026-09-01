@@ -13,7 +13,7 @@ exactly here, so the model is not invited.
 
     text = read(Path("~/Desktop/cv.pdf"))
     proposals = propose(text, existing_facts)
-    # he ticks some
+    # He ticks some
     accept(chosen)
 """
 from __future__ import annotations

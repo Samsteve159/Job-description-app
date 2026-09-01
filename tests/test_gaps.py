@@ -1,6 +1,6 @@
 """The gap closer, and the direction the override is allowed to run in.
 
-The truth gate stops a model inventing experience. It had also started stopping Sameer
+The truth gate stops a model inventing experience. It had also started stopping him
 from recording true things about his own career: "risk" appears in none of his facts, so
 every risk keyword reads as a gap, on the record of somebody who ran multi-banking
 treasury operations for three and a half years.
@@ -46,11 +46,11 @@ def fact(id, text, org=None, tags=None, kind="bullet", verified=True, order=0):
 
 
 FACTS = [
-    fact(1, "Treasury Analyst (Multi-Banking Operations)", org="Puma Energy",
+    fact(1, "Treasury Analyst (Multi-Banking Operations)", org="Halcyon Energy",
          kind="role", tags=["treasury", "banking operations"], order=1),
     fact(2, "Tracked e-banking and treasury metrics across a multi-country bank "
-            "account structure, feeding funding strategy.", org="Puma Energy"),
-    fact(3, "Built treasury dashboards used for regional reporting.", org="Puma Energy"),
+            "account structure, feeding funding strategy.", org="Halcyon Energy"),
+    fact(3, "Built treasury dashboards used for regional reporting.", org="Halcyon Energy"),
     fact(4, "Ran spend analysis across the distributor network.", org="Purchasing Index",
          tags=["spend analytics"]),
     fact(5, "Data Analyst", org="Purchasing Index", kind="role", order=0),
@@ -61,7 +61,7 @@ print("adjacency, which is arithmetic and not an opinion")
 near = gaps.adjacency("treasury risk", FACTS)
 check("facts sharing a word are found", len(near) >= 3, len(near))
 check("the most overlapping fact comes first",
-      "treasury" in (near[0].text or "").lower() or near[0].org == "Puma Energy", near[0].text)
+      "treasury" in (near[0].text or "").lower() or near[0].org == "Halcyon Energy", near[0].text)
 check("an unverified fact never counts as adjacent",
       all(f.id != 6 for f in near), [f.id for f in near])
 check("a term with nothing near it finds nothing",
@@ -98,21 +98,21 @@ check("closeable gaps rank above unclosable ones",
 
 print("\nroles a fact can attach to")
 check("roles come back in resume order",
-      gaps.roles(FACTS) == ["Purchasing Index", "Puma Energy"], gaps.roles(FACTS))
+      gaps.roles(FACTS) == ["Purchasing Index", "Halcyon Energy"], gaps.roles(FACTS))
 
 print("\nwriting an answer back to the source of truth")
 tmp = Path(tempfile.mkdtemp(prefix="jobapp-gaps-")) / "facts.json"
 tmp.write_text(json.dumps({
     "meta": {"owner": "test"},
     "facts": [
-        {"kind": "role", "org": "Puma Energy", "text": "Treasury Analyst",
+        {"kind": "role", "org": "Halcyon Energy", "text": "Treasury Analyst",
          "children": [{"kind": "bullet", "text": "An existing bullet."}]},
         {"kind": "skill", "text": "SQL"},
     ],
 }), encoding="utf-8")
 
 gaps.add_fact("Monitored FX exposure across the multi-country account structure.",
-              parent_org="Puma Energy", tags=["treasury risk"], seed_file=tmp)
+              parent_org="Halcyon Energy", tags=["treasury risk"], seed_file=tmp)
 saved = json.loads(tmp.read_text(encoding="utf-8"))
 role = saved["facts"][0]
 check("it lands under the right employer", len(role["children"]) == 2, role["children"])

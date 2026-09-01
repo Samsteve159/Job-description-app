@@ -8,9 +8,9 @@ safety does not live in the prompt. Prompts are advisory. These checks are not:
      a block left with no surviving citation is forced to "blocked".
 
   2. Number validation. Every figure in a generated block must appear in at least one of
-     the facts that block cites. This is what stops "$19.3M" quietly becoming "$29.3M", or
+     the facts that block cites. This is what stops "$4.5M" quietly becoming "$5.4M", or
      "39 of 54 categories" becoming "49 of 54". A drifted number is the single most likely
-     way this app could embarrass Sameer in an interview, and a model will do it casually.
+     way this app could embarrass he in an interview, and a model will do it casually.
 
   3. Headcount scan. He works solo. Any block claiming a team is blocked outright.
 
@@ -38,7 +38,7 @@ TAILORED_SECTIONS = ("summary", "skills", "experience")
 
 # figures a block might drift on: money, percentages, multiples, plain counts
 _NUMBER = re.compile(
-    r"(?:[$₹£€]\s?\d[\d,]*(?:\.\d+)?\s*(?:[KMBkmb]n?)?)"      # $19.3M, ₹1,700
+    r"(?:[$₹£€]\s?\d[\d,]*(?:\.\d+)?\s*(?:[KMBkmb]n?)?)"      # $4.5M, ₹1,700
     r"|(?:\d[\d,]*(?:\.\d+)?\s*%)"                              # 99.7%
     r"|(?:\b\d[\d,]*(?:\.\d+)?\s*(?:[KMBkmb]n?)\b)"             # 120M
     r"|(?:\b\d{2,}\b)"                                          # 87, 54
@@ -551,7 +551,7 @@ def to_payload(
             )
         ]
         # A role with no bullets still appears, with its title and dates. Dropping it
-        # deleted Puma Energy and HDFC Bank from a resume outright, which does not read
+        # deleted Halcyon Energy and HDFC Bank from a resume outright, which does not read
         # as brevity: it reads as a four-year hole the reader fills in unfavourably.
         # Title and dates only is a legitimate treatment for an older role. Silence is
         # not.

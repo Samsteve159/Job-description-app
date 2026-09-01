@@ -1,7 +1,7 @@
 """Gap closer: the override, and the one shape it is allowed to take.
 
 The truth gate exists to stop a *model* inventing experience. It was never meant to stop
-*Sameer* recording true things about his own career, and it had started to. The word
+*he* recording true things about his own career, and it had started to. The word
 "risk" appears in none of his 63 facts, so every risk keyword reads as a gap, on a record
 belonging to somebody who ran multi-banking treasury operations at an energy company for
 three and a half years. The likeliest reading is that the record under-describes the work,
@@ -12,7 +12,7 @@ the page unevidenced, it asks him a question and turns his answer into evidence.
 writes the question. He writes the answer. Nothing is saved that he has not typed or
 edited himself, and every fact created this way is stamped so it can be found again.
 
-**Closeability is computed, not asked of a model.** A model asked "could Sameer plausibly
+**Closeability is computed, not asked of a model.** A model asked "could he plausibly
 claim this?" will say yes to almost anything, which is the failure this whole app is built
 against. Adjacency to his existing record is arithmetic:
 

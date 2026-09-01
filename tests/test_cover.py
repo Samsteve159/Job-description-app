@@ -50,7 +50,7 @@ for text, expect in [
     ("I am passionate about data and a proven team player.", True),
     ("I would like to apply for this position.", True),
     ("Thank you for considering my application.", True),
-    ("Closed a $7.35M reporting variance and rebuilt the reconciliation logic.", False),
+    ("Closed a $1.8M reporting variance and rebuilt the reconciliation logic.", False),
     ("I rebuilt the reconciliation so the variance could not recur.", False),
 ]:
     hit = bool(found_cliches(text))
@@ -71,8 +71,8 @@ for text, expect in [
      "exactly the work I have done.", False),
     ("Your requirement for UNSPSC taxonomy and supplier master data matches my work.",
      False),
-    ("I built the SQL models behind a $120M value case.", False),
-    ("I closed a reporting variance of $7.35M.", False),
+    ("I built the SQL models behind a $60M value case.", False),
+    ("I closed a reporting variance of $1.8M.", False),
 ]:
     flagged = bool(unverifiable_company_claims(text, JD))
     check(f"{'flagged' if expect else 'allowed'}: {text[:50]!r}", flagged == expect,
@@ -112,23 +112,23 @@ check("bounds are the ones a reader actually tolerates",
 print("\nrendering")
 out = Path(tempfile.mkdtemp(prefix="jobapp-cover-")) / "c.docx"
 payload = CoverPayload(
-    name="Sameer Iyer", contact=["a@b.com", "Mumbai, India"],
+    name="Jane Doe", contact=["a@b.com", "Mumbai, India"],
     role="Manager, Procurement Analytics", company="Acme",
     date_line="27 August 2026",
-    paragraphs=["Closed a $7.35M reporting variance, and rebuilt the reconciliation "
+    paragraphs=["Closed a $1.8M reporting variance, and rebuilt the reconciliation "
                 "logic so it could not recur.",
                 "Your posting describes the same problem."])
 path = render_cover(payload, out)
 report = audit(path)
 check("the letter is ATS clean", report["ok"], report["problems"])
 text = str(report["text"])
-check("his name is at the top", text.split(chr(10))[0] == "Sameer Iyer", text[:40])
+check("his name is at the top", text.split(chr(10))[0] == "Jane Doe", text[:40])
 check("the contact line survives", "a@b.com" in text)
 check("the role and company are named", "Manager, Procurement Analytics" in text
       and "Acme" in text)
 check("the greeting and sign off are there",
       "Dear Hiring Manager," in text and "Kind regards," in text)
-check("both paragraphs are present", "7.35M" in text and "same problem" in text)
+check("both paragraphs are present", "1.8M" in text and "same problem" in text)
 check("nothing non-ASCII reaches the page",
       all(ord(c) < 128 for c in text),
       [f"U+{ord(c):04X}" for c in text if ord(c) > 127])

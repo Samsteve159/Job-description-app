@@ -261,7 +261,7 @@ check("no must-haves is said plainly, not divided by zero",
 print("\nlocation is flagged, never scored")
 # Where a job is says nothing about whether he can do it. Scoring it mixed two unlike
 # things into one number: a role he is perfect for in the wrong city scored below a role
-# he is weak on down the road. Whether to move is his call and is not a fit question.
+# He is weak on down the road. Whether to move is his call and is not a fit question.
 from modules.fit import assess  # noqa: E402
 
 def _loc(place):

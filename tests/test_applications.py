@@ -5,7 +5,7 @@ admin a job search sheds. Every serious employer acknowledges within minutes, so
 record already exists in his mailbox.
 
 Two things must not happen: counting a rejection as a fresh application, and counting the
-same one twice. Both are tested below against the real Wells Fargo acknowledgement.
+same one twice. Both are tested below against the real Northwind Bank acknowledgement.
 
     python3 tests/test_applications.py
 """
@@ -33,7 +33,7 @@ def check(label, condition, detail=""):
 
 
 print("telling an acknowledgement from everything else")
-for yes in ("Wells Fargo Careers: Thank you for applying",
+for yes in ("Northwind Bank Careers: Thank you for applying",
             "Your application has been received",
             "Application received: Data Analyst",
             "Thank you for your interest in Deloitte"):
@@ -50,9 +50,9 @@ for no in ("Unfortunately we are not moving forward with your application",
 
 print("\nwho it was to")
 check("the subject names the employer before the colon",
-      company_from("wellsfargoworkday@wellsfargo.com",
-                   "Wells Fargo Careers: Thank you for applying") == "Wells Fargo",
-      company_from("wellsfargoworkday@wellsfargo.com", "Wells Fargo Careers: Thank you for applying"))
+      company_from("careers@northwindbank.com",
+                   "Northwind Bank Careers: Thank you for applying") == "Northwind Bank",
+      company_from("careers@northwindbank.com", "Northwind Bank Careers: Thank you for applying"))
 check("the domain answers when the subject does not",
       company_from("no-reply@deloitte.com", "Thank you for applying") == "Deloitte",
       company_from("no-reply@deloitte.com", "Thank you for applying"))
@@ -64,7 +64,7 @@ for ats in ("no-reply@myworkday.com", "jobs@greenhouse.io", "careers@icims.com")
           got.lower() not in ("myworkday", "workday", "greenhouse", "icims"), got)
 
 print("\nwhich job")
-BODY = ("Dear Sameer, Thank you for your interest in Wells Fargo. We have received your "
+BODY = ("Dear he, Thank you for your interest in Northwind Bank. We have received your "
         "application for the following position: R-570561 Lead Analytics Consultant - "
         "We appreciate the time you have taken to share your background.")
 check("the role is read out of the body",

@@ -46,7 +46,7 @@ seed_profile: 58 facts (4 roles, 20 bullets, 23 skills,
 8. Cover letter, screening answers
 9. Interview Brief
 
-## Waiting on Sameer
+## Waiting on him
 
 - **NIM API key** (build.nvidia.com) into `.env` as `NIM_API_KEY`. Every guard and the
   renderer work without it. `extract` and `tailor` are written but unrun

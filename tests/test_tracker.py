@@ -43,7 +43,7 @@ db = next(get_db())
 NOW = datetime(2026, 8, 26, 12, 0)
 
 print("logging")
-a = tracker.log_application(db, title="Treasury Analyst", company="Wells Fargo",
+a = tracker.log_application(db, title="Treasury Analyst", company="Northwind Bank",
                             source="manual")
 check("an application is logged", a.id is not None and a.status == "applied")
 check("it starts at the first stage", a.furthest_status == "applied", a.furthest_status)
@@ -138,17 +138,17 @@ from types import SimpleNamespace  # noqa: E402
 def pkg(company, title, status):
     return SimpleNamespace(company=company, title=title, status=status)
 
-keys = {("wells fargo", "lead analytics consultant"), ("wells fargo", "")}
+keys = {("northwind bank", "lead analytics consultant"), ("northwind bank", "")}
 check("a package he applied to reads applied, not exported",
-      tracker.display_status(pkg("Wells Fargo", "Lead Analytics Consultant", "exported"),
+      tracker.display_status(pkg("Northwind Bank", "Lead Analytics Consultant", "exported"),
                              keys) == "applied")
 check("applied outranks whatever the package thinks it is",
-      tracker.display_status(pkg("Wells Fargo", "Lead Analytics Consultant", "draft"),
+      tracker.display_status(pkg("Northwind Bank", "Lead Analytics Consultant", "draft"),
                              keys) == "applied")
 # Employers and this app word titles differently. Having applied there at all is the
 # stronger signal, and the alternative is a package sitting at exported for ever.
 check("a different wording at the same employer still counts",
-      tracker.display_status(pkg("Wells Fargo", "Lead Analytics Consultant II", "exported"),
+      tracker.display_status(pkg("Northwind Bank", "Lead Analytics Consultant II", "exported"),
                              keys) == "applied")
 check("a different employer does not",
       tracker.display_status(pkg("Deloitte", "Lead Analytics Consultant", "exported"),
@@ -156,7 +156,7 @@ check("a different employer does not",
 check("a package with no company keeps its own status",
       tracker.display_status(pkg(None, "Analyst", "draft"), keys) == "draft")
 check("and an empty tracker changes nothing",
-      tracker.display_status(pkg("Wells Fargo", "Lead", "exported"), set()) == "exported")
+      tracker.display_status(pkg("Northwind Bank", "Lead", "exported"), set()) == "exported")
 
 print(f"\n{passed} passed, {failed} failed")
 raise SystemExit(1 if failed else 0)

@@ -8,7 +8,7 @@ appear in a cited fact, headcount is refused. `tailor._validate` does all of it 
 reused verbatim rather than reimplemented, because a second copy of a safety check is a
 second copy to forget to update.
 
-The second kind is claims about *them*. "I have long admired Wells Fargo's leadership in
+The second kind is claims about *them*. "I have long admired Northwind Bank's leadership in
 digital treasury" invents a fact about a company and a feeling about it in one sentence,
 and no citation guard would notice: the paragraph can cite a perfectly real fact about his
 SQL work while opening with a fabrication. So company claims are checked against the job

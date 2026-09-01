@@ -2,7 +2,7 @@
 
 The career record flows one way, from data/profile_facts.json into ProfileFact, and
 seed_profile.py wipes and reloads because the file is the source of truth. Contact details
-run the other way. Sameer edits them in the app, so the database is the source of truth and
+run the other way. He edits them in the app, so the database is the source of truth and
 a re-seed must not be able to revert them.
 
 That is the whole reason ContactDetail is a separate table. It is not tidiness. Leaving a

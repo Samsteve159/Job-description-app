@@ -44,7 +44,7 @@ _ROLE_IN_BODY = (
     re.compile(r"applied (?:to|for)(?: the)?(?: position of)?:?\s*([^\n<.]{3,90})", re.I),
 )
 
-# Wells Fargo writes "Wells Fargo Careers: Thank you for applying". The company is the
+# Northwind Bank writes "Northwind Bank Careers: Thank you for applying". The company is the
 # part before the colon far more often than it is anything else in the message.
 _COMPANY_IN_SUBJECT = re.compile(r"^([A-Z][\w&.,' -]{2,40}?)\s*(?:careers?|recruiting|"
                                  r"talent|hr)?\s*[:\-–]", re.I)

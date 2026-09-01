@@ -55,7 +55,7 @@ ok("name read from the first line", p.name == "Jane Doe", p.name)
 ok("email extracted", p.email == "jane.doe@example.com", p.email)
 ok("phone extracted", p.phone is not None, p.phone)
 
-p = simulate_parse("Curriculum Vitae 2026\nsameer@x.com\n")
+p = simulate_parse("Curriculum Vitae 2026\njane@x.com\n")
 ok("a heading is not mistaken for a name", p.name is None or "Vitae" not in (p.name or ""), p.name)
 
 for good in ["Dec 2023 - Present", "Apr 2018 - Oct 2021", "2018 - 2021", "03/2015 - 03/2018"]:
@@ -132,27 +132,27 @@ ok("no headline given, none written",
    str(audit(f2)["text"]).splitlines()[1])
 
 ok("the file on disk is named for a person and a role",
-   export_name("Sameer Iyer", "Lead Treasury Analyst", 18)
-   == "Sameer Iyer - Lead Treasury Analyst (18).docx",
-   export_name("Sameer Iyer", "Lead Treasury Analyst", 18))
+   export_name("Jane Doe", "Lead Treasury Analyst", 18)
+   == "Jane Doe - Lead Treasury Analyst (18).docx",
+   export_name("Jane Doe", "Lead Treasury Analyst", 18))
 ok("the download drops the id, which means nothing to a recruiter",
-   export_name("Sameer Iyer", "Lead Treasury Analyst")
-   == "Sameer Iyer - Lead Treasury Analyst.docx",
-   export_name("Sameer Iyer", "Lead Treasury Analyst"))
+   export_name("Jane Doe", "Lead Treasury Analyst")
+   == "Jane Doe - Lead Treasury Analyst.docx",
+   export_name("Jane Doe", "Lead Treasury Analyst"))
 ok("a cover letter says so in the name",
-   export_name("Sameer Iyer", "Analyst", 3, kind="Cover Letter")
-   == "Sameer Iyer - Analyst - Cover Letter (3).docx",
-   export_name("Sameer Iyer", "Analyst", 3, kind="Cover Letter"))
+   export_name("Jane Doe", "Analyst", 3, kind="Cover Letter")
+   == "Jane Doe - Analyst - Cover Letter (3).docx",
+   export_name("Jane Doe", "Analyst", 3, kind="Cover Letter"))
 ok("characters a filesystem or a mail client would choke on are dropped",
-   export_name("Sameer Iyer", "Sr. Analyst / FP&A (Mumbai)", 4)
-   == "Sameer Iyer - Sr. Analyst FP&A Mumbai (4).docx",
-   export_name("Sameer Iyer", "Sr. Analyst / FP&A (Mumbai)", 4))
+   export_name("Jane Doe", "Sr. Analyst / FP&A (Mumbai)", 4)
+   == "Jane Doe - Sr. Analyst FP&A Mumbai (4).docx",
+   export_name("Jane Doe", "Sr. Analyst / FP&A (Mumbai)", 4))
 ok("a missing title still gives a usable name",
-   export_name("Sameer Iyer", "", 9) == "Sameer Iyer (9).docx",
-   export_name("Sameer Iyer", "", 9))
+   export_name("Jane Doe", "", 9) == "Jane Doe (9).docx",
+   export_name("Jane Doe", "", 9))
 ok("a very long title is trimmed rather than refused",
-   len(export_name("Sameer Iyer", "Manager " * 30, 1)) < 100,
-   len(export_name("Sameer Iyer", "Manager " * 30, 1)))
+   len(export_name("Jane Doe", "Manager " * 30, 1)) < 100,
+   len(export_name("Jane Doe", "Manager " * 30, 1)))
 
 print("\ngate")
 try:

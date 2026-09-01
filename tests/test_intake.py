@@ -30,14 +30,14 @@ def check(label, condition, detail=""):
         print(f"  FAIL  {label}  {detail}")
 
 
-CV = """# Sameer Iyer
-sameer@example.com | +61 400 000 000 | linkedin.com/in/someone
+CV = """# Jane Doe
+he@example.com | +61 400 000 000 | linkedin.com/in/someone
 Page 1 of 2
 
 ## Experience
 Dec 2023 - Present
 - Built a spend categorisation pipeline covering 98.4% of categorised spend
-- Delivered a $19.3M unmatched-spend finding into a five-year value case
+- Delivered a $4.5M unmatched-spend finding into a five-year value case
 - Automated reconciliation across four source systems
 
 ## Skills

@@ -48,10 +48,10 @@ HTTP 999 to any automated fetch and always will. The module detects that class o
 asks for a paste instead. Driving a logged-in Chrome would defeat the auth wall and may get
 added later; paste always works, so it is not blocking.
 
-**`STRICT_NUMBERS` is a flag rather than a hard rule.** It catches a model turning $19.3M
-into $29.3M, which is an accuracy bug rather than a stylistic one. It only ever fires on a
+**`STRICT_NUMBERS` is a flag rather than a hard rule.** It catches a model turning $4.5M
+into $5.4M, which is an accuracy bug rather than a stylistic one. It only ever fires on a
 figure that is not in the cited facts, so it cannot block a true claim. Default on, and
-switchable in `.env`. Sameer's call.
+switchable in `.env`. His call.
 
 **Interview Brief was scoped down deliberately.** An earlier version included story
 matching against the career record. That would have quietly required `ProfileFact` and
@@ -74,7 +74,7 @@ a live client system, its own database, its own tunnel hostname, a bearer-token 
 endpoint, and a privacy boundary to enforce and test because career facts would have been
 on one side of it and a network call on the other.
 
-All of that bought automatic job discovery. Which is the one part of the search Sameer was
+All of that bought automatic job discovery. Which is the one part of the search he was
 already doing, in about thirty seconds, on LinkedIn.
 
 The India market runs on LinkedIn and Naukri. Adzuna's Indian index is thin, and JSearch's

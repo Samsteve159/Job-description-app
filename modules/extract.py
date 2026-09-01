@@ -120,7 +120,7 @@ class Extraction:
 
         Prefers the set derived from the posting's own structure. The model's per
         requirement keywords are the fallback, used when a posting has no headings to
-        read, and they are the reason this exists: the same Wells Fargo description
+        read, and they are the reason this exists: the same Northwind Bank description
         produced eighteen must-haves on one run and three on the next, so a resume passed
         or failed on which reading the model took that afternoon.
         """

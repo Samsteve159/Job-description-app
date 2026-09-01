@@ -1,16 +1,16 @@
 # Job_App — working notes for Claude
 
-A local macOS app that runs Sameer Iyer's India job search. Three sections, one of which is
+A local macOS app that runs the user's India job search. Three sections, one of which is
 deliberately isolated from the other two.
 
 **Read `TRACKER.md` first** for current status and what is blocked.
 Then `SPEC.md` for what it does and `DECISIONS.md` for why it is shaped this way.
-Patterns are borrowed from an earlier system of Sameer's (FastAPI + SQLite + APScheduler
+Patterns are borrowed from an earlier system of his (FastAPI + SQLite + APScheduler
 + LLM + human approval gate). That project is not a dependency and is not read at runtime.
 
 ## Committing. Do this without being asked.
 
-**At the end of every session, and whenever Sameer says pause, stop or we are done:
+**At the end of every session, and whenever he says pause, stop or we are done:
 stage, commit and push.** He has standing authorisation for this, so do not ask first.
 
 ```bash
@@ -44,10 +44,45 @@ just asked, no summaries of work he watched happen, no bullet lists restating th
 point three ways. If something needs a long explanation, that is a sign it needs a
 decision from him, so ask the one question instead of writing the essay.
 
+## What may not go in a tracked file
+
+**Write every doc, comment and commit message as though the repo were public.** It is
+private today. Private is a setting, and a setting is one click and one careless invite
+from being something else. Nothing here is worth the bet.
+
+Out of the docs entirely:
+
+- **His name.** "the user", "he", "his". A repo full of career figures is one search away
+  from being about a specific person, and the code does not need to know who he is
+- **Client names**, and the figures attached to them. `$19.3M` and `$7.35M` are real
+  findings from real engagements belonging to his employer. Where a doc needs a number to
+  illustrate a rule, invent one
+- **Employers he has worked for or applied to.** "a US bank", "the treasury role". The
+  point being made is never about which company it was
+- **Contact details.** Email, phone, address. They live in the database and in
+  `data/profile_facts.json`, both gitignored, and nowhere else
+- **Anything from `Assets/`**, which holds unredacted client names
+
+Two files are expected to match that scan and are excluded from it. This one, because a
+scan for a name has to contain the name. And `desktop/build_app.sh`, whose bundle
+identifier carries his name and must keep it: macOS keys the Full Disk Access grant to
+that string, so renaming it costs him another trip through System Settings and buys
+nothing, since a bundle id is never published anywhere.
+
+None of this applies to `data/`. That is where his real record belongs and every file in
+it that carries one is gitignored. The rule is about what gets committed.
+
+Before committing, the scan below covers credentials. This one covers him:
+
+```bash
+git grep --cached -niE "sameer|nando|nufarm|5ways|19\.3M|7\.35M" \
+  | grep -vE "^CLAUDE.md:|^desktop/build_app.sh:"
+```
+
 ## Scope boundary
 
 **This directory is the whole project.** Do not read from, write to, or reference anything
-outside `Job_App/`. If the app needs a fact about Sameer it goes in `data/profile_facts.json`.
+outside `Job_App/`. If the app needs a fact about him it goes in `data/profile_facts.json`.
 That file is this project's own copy, on purpose, so nothing here depends on work that
 lives elsewhere.
 
@@ -59,7 +94,7 @@ lives elsewhere.
    Tailoring itself is meant to be aggressive: reframe into the JD's vocabulary, reorder to
    what the job weights, claim adjacent skills where evidence supports it. Per-job tweaking
    is the product, not a risk to be managed.
-2. **No headcount claims.** Sameer works solo end to end. Never "led a team", "managed",
+2. **No headcount claims.** He works solo end to end. Never "led a team", "managed",
    "mentored". Frame scope as ownership and range. Enforced in `modules/prompts.py`.
 3. **No em dashes.** Anywhere. In generated output, in this repo's docs, in comments.
    `HOUSE_STYLE` in `modules/prompts.py` carries the rule into every prompt.
@@ -93,7 +128,7 @@ letting it run on Claude.
 ## Flags
 
 `STRICT_NUMBERS` (default true) blocks any figure not present in the facts a block cites.
-It only fires on invented numbers. Sameer's call whether it stays on; do not argue it again.
+It only fires on invented numbers. His call whether it stays on; do not argue it again.
 
 `config.describe()` prints one greppable line with the full flag and routing state.
 

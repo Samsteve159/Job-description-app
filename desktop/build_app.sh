@@ -55,6 +55,10 @@ PLIST
 
 # An unsigned bundle has no stable identity, so macOS cannot record a permission grant
 # against it and every launch from a protected folder such as Desktop fails silently.
+#
+# The identifier below carries his name and stays that way on purpose. macOS keys the
+# Full Disk Access grant to it, so renaming it costs him another trip through System
+# Settings for no gain: a bundle id is not published anywhere, it lives on his Mac.
 if [ "$REUSED" = "0" ]; then
   codesign --force --sign - --identifier com.sameeriyer.jobapp "$APP" 2>/dev/null \
     && echo "signed (ad hoc)" || echo "WARNING: codesign failed, Desktop access may be refused"

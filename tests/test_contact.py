@@ -44,9 +44,9 @@ def fresh_db():
 def seed_facts(db):
     """What scripts/seed_profile.py writes: name and contact rows from the JSON."""
     rows = [
-        ProfileFact(kind="name", text="Sameer Iyer", order_index=0),
-        ProfileFact(kind="contact", text="sameeriyer23@gmail.com", order_index=1),
-        ProfileFact(kind="contact", text="linkedin.com/in/sameeriyer-analytics", order_index=2),
+        ProfileFact(kind="name", text="Jane Doe", order_index=0),
+        ProfileFact(kind="contact", text="jane.doe@example.com", order_index=1),
+        ProfileFact(kind="contact", text="linkedin.com/in/jane-doe-analytics", order_index=2),
         ProfileFact(kind="contact", text="Mumbai, India", order_index=3),
         ProfileFact(kind="contact", text="+61 477 542 567", order_index=4),
     ]
@@ -57,8 +57,8 @@ def seed_facts(db):
 
 print("classification")
 for text, want in [
-    ("sameeriyer23@gmail.com", "email"),
-    ("linkedin.com/in/sameeriyer-analytics", "link"),
+    ("jane.doe@example.com", "email"),
+    ("linkedin.com/in/jane-doe-analytics", "link"),
     ("https://github.com/someone", "link"),
     ("+61 477 542 567", "phone"),
     ("+91 98200 12345", "phone"),
@@ -71,10 +71,10 @@ db = fresh_db()
 seed_facts(db)
 check("imports every contact fact", bootstrap(db) == 5, bootstrap(db))
 check("a second call is a no-op", bootstrap(db) == 0)
-check("name is separated from the contact line", display_name(db) == "Sameer Iyer")
+check("name is separated from the contact line", display_name(db) == "Jane Doe")
 check("contact line is in resume order",
-      resume_lines(db) == ["sameeriyer23@gmail.com", "+61 477 542 567",
-                           "linkedin.com/in/sameeriyer-analytics", "Mumbai, India"],
+      resume_lines(db) == ["jane.doe@example.com", "+61 477 542 567",
+                           "linkedin.com/in/jane-doe-analytics", "Mumbai, India"],
       resume_lines(db))
 
 print("\nsurviving a re-seed")

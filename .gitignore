@@ -5,6 +5,9 @@
 data/profile_facts.json
 data/search_criteria.json
 
+# saved job descriptions. Somebody else's text, and it names the employer
+data/jds/
+
 # generated
 data/*.db
 data/output/

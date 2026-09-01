@@ -76,7 +76,7 @@ for required in ("summary", "experience", "education", "skills", "certifications
 print("\ncatching it in the draft")
 rules = read_rules(SPEC)
 check("a clean bullet passes",
-      violations("Scaled a $19.3M finding into a $120M five-year value case.", rules) == [])
+      violations("Scaled a $4.5M finding into a $60M five-year value case.", rules) == [])
 check("a banned adjective is caught",
       "robust" in violations("Built robust pipelines.", rules))
 # "leverage" as written let "leveraged" through, which is the same word doing the same job.
@@ -92,7 +92,7 @@ check("no rules means no violations", violations("Anything at all.", None) == []
 check("empty rules means no violations", violations("Anything at all.", {}) == [])
 
 print("\nthe real spec he wrote")
-real = Path("/Users/sameeriyer/Desktop/Claude Projects/Linkedin_Profile/resume_build_spec.md")
+real = Path(__file__).resolve().parent.parent.parent / "resume_build_spec.md"
 if real.exists():
     found = read_rules(real.read_text())["banned"]
     check("it yields a usable number of terms, not none and not everything",

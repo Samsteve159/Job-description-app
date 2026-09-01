@@ -153,7 +153,7 @@ def scan_inbox(db: Session = Depends(get_db)):
 def posts(request: Request):
     return render(request, "not_built.html", module="posts", section="",
                   heading="Post Writer",
-                  why="The second module. The article writer Sameer already runs "
+                  why="The second module. The article writer he already runs "
                       "elsewhere lands here, so both tools share one window, one theme "
                       "and one set of details.",
                   blocked_on=["A decision on whether to port the existing app in or "
