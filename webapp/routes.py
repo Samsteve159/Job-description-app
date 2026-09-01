@@ -44,6 +44,20 @@ log = logging.getLogger(__name__)
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
+
+# Status is shown in two lists and had to agree in both. Filters rather than a computed
+# field on the row, because the answer depends on the tracker and a Package has no
+# business knowing about applications.
+_STATUS_CLASS = {
+    "applied": "verified",     # green. It is out of his hands and that is the goal
+    "exported": "inferred",    # amber. Built and downloaded, but not yet sent
+    "ready": "inferred",
+    "draft": "blocked",        # red. Nothing has left the machine
+}
+
+templates.env.filters["status_of"] = lambda package, keys: tracker.display_status(
+    package, keys or set())
+templates.env.filters["status_class"] = lambda status: _STATUS_CLASS.get(status, "section")
 router = APIRouter()
 
 OUTPUT_DIR = BASE_DIR / "data" / "output"
@@ -82,7 +96,7 @@ def dashboard(request: Request, db: Session = Depends(get_db), message: str = ""
     from modules import gmail
     return render(request, "dashboard.html", section="dashboard", _db=db,
                   stats=tracker.stats(db), gmail_ready=gmail.connected(),
-                  message=message or None,
+                  message=message or None, applied_keys=tracker.applied_keys(db),
                   packages=db.query(Package).filter(Package.status != "deleted").order_by(
                       Package.created_at.desc()).limit(8).all())
 
@@ -184,6 +198,7 @@ def _writer_view(request: Request, db: Session, **kw):
     packages = (db.query(Package).filter(Package.status != "deleted")
                 .order_by(Package.created_at.desc()).limit(10).all())
     context = dict(packages=packages,
+                   applied_keys=tracker.applied_keys(db),
                    resume_spec=design.active(db, "resume"),
                    cover_spec=design.active(db, "cover"))
     context.update({k: (v or None) for k, v in kw.items()})

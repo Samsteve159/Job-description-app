@@ -107,6 +107,32 @@ def remove(db: Any, application_id: int) -> None:
         db.commit()
 
 
+def applied_keys(db: Any) -> set:
+    """Company and title of everything he has actually applied to, normalised.
+
+    A package knows it produced a document. It does not know he then sent it, and the
+    confirmation that proves he did arrives by email with no reference back. So the two
+    are matched on what they have in common: who the job was with and what it was called.
+    """
+    keys = set()
+    for row in db.query(Application).filter(Application.active.is_(True)).all():
+        company = (row.company or "").strip().lower()
+        title = (row.title or "").strip().lower()
+        if company:
+            keys.add((company, title))
+            keys.add((company, ""))          # applied there, title unread or worded differently
+    return keys
+
+
+def display_status(package: Any, keys: set) -> str:
+    """What to show on the list. `applied` outranks anything the package knows itself."""
+    company = (getattr(package, "company", "") or "").strip().lower()
+    title = (getattr(package, "title", "") or "").strip().lower()
+    if company and ((company, title) in keys or (company, "") in keys):
+        return "applied"
+    return getattr(package, "status", "") or "draft"
+
+
 def all_applications(db: Any, include_inactive: bool = False) -> List[Application]:
     query = db.query(Application)
     if not include_inactive:

@@ -97,7 +97,8 @@
       <tr>
         <td>{{ p.title or 'Untitled' }}</td>
         <td>{{ p.company or '' }}</td>
-        <td><span class="badge section">{{ p.status }}</span></td>
+        {% set shown = p | status_of(applied_keys) %}
+        <td><span class="badge {{ shown | status_class }}">{{ shown }}</span></td>
         <td style="color: var(--muted);">{{ p.created_at.strftime('%d %b, %H:%M') }}</td>
         <td style="text-align: right;"><a href="/job/writer/{{ p.id }}">Open</a></td>
       </tr>

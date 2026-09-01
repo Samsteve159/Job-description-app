@@ -129,5 +129,34 @@ check("but the row survives",
 check("and it stops counting", tracker.stats(db, now=NOW)["total"] == 4)
 
 db.close()
+print("\nwhat a package's status should say")
+# A package knows it produced a document. It does not know he then sent it, and the
+# confirmation proving he did arrives by email with no reference back to the package. So
+# the two are matched on what they share: the employer and the role.
+from types import SimpleNamespace  # noqa: E402
+
+def pkg(company, title, status):
+    return SimpleNamespace(company=company, title=title, status=status)
+
+keys = {("wells fargo", "lead analytics consultant"), ("wells fargo", "")}
+check("a package he applied to reads applied, not exported",
+      tracker.display_status(pkg("Wells Fargo", "Lead Analytics Consultant", "exported"),
+                             keys) == "applied")
+check("applied outranks whatever the package thinks it is",
+      tracker.display_status(pkg("Wells Fargo", "Lead Analytics Consultant", "draft"),
+                             keys) == "applied")
+# Employers and this app word titles differently. Having applied there at all is the
+# stronger signal, and the alternative is a package sitting at exported for ever.
+check("a different wording at the same employer still counts",
+      tracker.display_status(pkg("Wells Fargo", "Lead Analytics Consultant II", "exported"),
+                             keys) == "applied")
+check("a different employer does not",
+      tracker.display_status(pkg("Deloitte", "Lead Analytics Consultant", "exported"),
+                             keys) == "exported")
+check("a package with no company keeps its own status",
+      tracker.display_status(pkg(None, "Analyst", "draft"), keys) == "draft")
+check("and an empty tracker changes nothing",
+      tracker.display_status(pkg("Wells Fargo", "Lead", "exported"), set()) == "exported")
+
 print(f"\n{passed} passed, {failed} failed")
 raise SystemExit(1 if failed else 0)
