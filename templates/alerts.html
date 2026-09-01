@@ -3,6 +3,19 @@
 
 <div style="display: flex; gap: 16px; align-items: baseline; flex-wrap: wrap;">
   <h1 style="margin-bottom: 0;">Job Alerts</h1>
+  <form method="post" action="/job/alerts/sync" style="align-self: center;">
+    <input type="hidden" name="days" value="14">
+    <button type="submit" title="Read your inbox again. Takes a few seconds."
+            style="display: inline-flex; align-items: center; gap: 7px;">
+      <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor"
+           stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"
+           aria-hidden="true">
+        <path d="M21 12a9 9 0 1 1-2.64-6.36"></path>
+        <path d="M21 3v6h-6"></path>
+      </svg>
+      Sync
+    </button>
+  </form>
   <span style="flex: 1;"></span>
   {% if cleared_count %}
     <form method="post" action="/job/alerts/restore">
@@ -21,8 +34,13 @@
 </div>
 
 <p class="lead">
-  {{ rows|length }} job{{ '' if rows|length == 1 else 's' }} the boards emailed you in the
-  last {{ days }} days, best match first.
+  {{ rows|length }} job{{ '' if rows|length == 1 else 's' }} from your alerts, best match
+  first.
+  {% if last_sync %}
+    <span class="hint">Last synced {{ last_sync.strftime('%d %b, %H:%M') }} UTC.</span>
+  {% else %}
+    <span class="hint">Never synced. Press Sync to read your inbox.</span>
+  {% endif %}
 </p>
 
 {% if off_target %}
@@ -70,7 +88,12 @@
 </p>
 {% else %}
 <div class="empty panel">
-  <p>Nothing here. Either no alerts have arrived, or you have cleared them all.</p>
+  {% if last_sync %}
+    <p>Nothing here. Either no alerts have arrived since the last sync, or you have
+      cleared them all.</p>
+  {% else %}
+    <p>Nothing pulled yet. Press <strong>Sync</strong> to read your inbox.</p>
+  {% endif %}
 </div>
 {% endif %}
 

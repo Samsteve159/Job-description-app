@@ -3,7 +3,8 @@
 Two families of tables that must never touch each other:
 
   Sections 1 and 2 (Resume & Cover Writer, and the application tracker)
-      ContactDetail, DesignSpec, DismissedAlert, ProfileFact, Requirement, Package, GeneratedBlock,
+      AlertListing, ContactDetail, DesignSpec, DismissedAlert, ProfileFact,
+      Requirement, SyncState, Package, GeneratedBlock,
       Application
 
   Section 3 (Interview Brief) -- fully standalone
@@ -86,9 +87,8 @@ class ProfileFact(Base):
 class DismissedAlert(Base):
     """A job alert he has cleared away.
 
-    The alerts screen re-reads Gmail on every visit, so a cleared row would come back
-    thirty seconds later with nothing to stop it. Keyed by source and the board's own job
-    id, which is stable across the several emails a board sends about the same job.
+    Kept keyed by source and the board's own job id, which is stable across the several
+    emails a board sends about the same job.
     """
     __tablename__ = "dismissed_alerts"
 
@@ -96,6 +96,38 @@ class DismissedAlert(Base):
     key = Column(String(128), nullable=False, unique=True, index=True)
     label = Column(Text, nullable=True)          # kept so a mistake is recoverable
     created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class AlertListing(Base):
+    """A job an alert email carried, stored rather than re-read.
+
+    Reading Gmail took nine seconds on eighteen messages, because each one needs its body
+    fetched to find the links. Paying that on every visit to the screen makes the screen
+    something he stops opening. Pulled on demand instead, and kept.
+    """
+    __tablename__ = "alert_listings"
+
+    id = Column(Integer, primary_key=True)
+    key = Column(String(128), nullable=False, unique=True, index=True)
+    source = Column(String(32), nullable=False)
+    external_id = Column(String(128), nullable=False)
+    url = Column(Text, default="")
+    title = Column(Text, default="")
+    company = Column(String(256), default="")
+    location = Column(String(256), default="")
+    subject = Column(Text, default="")
+    received = Column(DateTime, nullable=True)
+    first_seen = Column(DateTime, default=datetime.utcnow)
+
+
+class SyncState(Base):
+    """When each feed was last pulled, so the screen can say so rather than imply it."""
+    __tablename__ = "sync_state"
+
+    id = Column(Integer, primary_key=True)
+    name = Column(String(64), nullable=False, unique=True, index=True)
+    last_run = Column(DateTime, nullable=True)
+    note = Column(Text, default="")
 
 
 class DesignSpec(Base):

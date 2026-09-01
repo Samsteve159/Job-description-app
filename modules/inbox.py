@@ -261,3 +261,54 @@ def scan(days: int = 7, limit: int = 60, svc: Any = None) -> List[Listing]:
     log.info("inbox: %d listing(s) from %d message(s) over %d day(s)",
              len(out), len(messages), days)
     return out
+
+
+# --------------------------------------------------------------------------- storage
+
+def store(db: Any, listings: Sequence[Listing]) -> int:
+    """Keep what a pull found. Returns how many were new.
+
+    Upserted rather than replaced, so a job that has scrolled out of the last seven days
+    of mail does not vanish from the screen while it is still open.
+    """
+    from database.models import AlertListing, SyncState
+
+    known = {row.key for row in db.query(AlertListing).all()}
+    added = 0
+    for listing in listings:
+        if listing.key in known:
+            continue
+        db.add(AlertListing(
+            key=listing.key, source=listing.source, external_id=listing.external_id,
+            url=listing.url or "", title=listing.title or "",
+            company=listing.company or "", location=listing.location or "",
+            subject=listing.subject or "", received=listing.received))
+        added += 1
+
+    state = db.query(SyncState).filter(SyncState.name == "alerts").first()
+    if state is None:
+        state = SyncState(name="alerts")
+        db.add(state)
+    state.last_run = datetime.utcnow()
+    state.note = f"{len(listings)} listing(s) read, {added} new"
+    db.commit()
+    log.info("inbox: stored %d new listing(s) of %d", added, len(listings))
+    return added
+
+
+def stored(db: Any) -> List[Listing]:
+    """What the last pulls found, newest first. No network, no wait."""
+    from database.models import AlertListing
+
+    rows = db.query(AlertListing).all()
+    out = [Listing(source=r.source, external_id=r.external_id, url=r.url or "",
+                   title=r.title or "", company=r.company or "",
+                   location=r.location or "", received=r.received,
+                   subject=r.subject or "") for r in rows]
+    return sorted(out, key=lambda l: (l.received or datetime.min), reverse=True)
+
+
+def last_sync(db: Any) -> Optional[datetime]:
+    from database.models import SyncState
+    state = db.query(SyncState).filter(SyncState.name == "alerts").first()
+    return state.last_run if state else None

@@ -899,7 +899,8 @@ def details_visibility(request: Request, db: Session = Depends(get_db),
 # ------------------------------------------------------------- not built yet
 
 @router.get("/job/alerts")
-def alerts(request: Request, db: Session = Depends(get_db), days: int = 7):
+def alerts(request: Request, db: Session = Depends(get_db), days: int = 14,
+           message: str = "", error: str = "", error_title: str = ""):
     """Jobs the boards emailed him. The scout, arriving by the only honest route."""
     from modules import gmail, inbox
 
@@ -911,12 +912,10 @@ def alerts(request: Request, db: Session = Depends(get_db), days: int = 7):
                           "way to get at those boards without scraping them.",
                       blocked_on=["Gmail is not connected. Run "
                                   "python3 scripts/gmail_auth.py"])
-    try:
-        listings = inbox.scan(days=days)
-    except Exception as exc:  # noqa: BLE001 - a dead token must not be a stack trace
-        return render(request, "alerts.html", section="alerts", listings=[], days=days,
-                      rows=[], error=f"Could not read your inbox: {exc}",
-                      error_title="Gmail did not answer")
+    # Read from what the last pull stored. Reading Gmail here cost nine seconds on
+    # eighteen messages, because every one needs its body fetched to find the links, and
+    # a screen that takes nine seconds is a screen he stops opening. Sync is a button.
+    listings = inbox.stored(db)
 
     cleared = {row.key for row in db.query(DismissedAlert).all()}
     listings = [l for l in listings if l.key not in cleared]
@@ -932,7 +931,34 @@ def alerts(request: Request, db: Session = Depends(get_db), days: int = 7):
 
     return render(request, "alerts.html", section="alerts", days=days, rows=rows,
                   listings=listings, off_target=inbox.off_target(listings),
-                  cleared_count=len(cleared))
+                  cleared_count=len(cleared), last_sync=inbox.last_sync(db),
+                  message=message or None, error=error or None,
+                  error_title=error_title or None)
+
+
+@router.post("/job/alerts/sync")
+def alerts_sync(db: Session = Depends(get_db), days: int = Form(14)):
+    """Pull fresh alerts from Gmail. The only place in this screen that waits."""
+    from modules import gmail, inbox
+
+    if not gmail.connected():
+        return RedirectResponse("/job/alerts?error=" + quote(
+            "Gmail is not connected. Run python3 scripts/gmail_auth.py"), status_code=303)
+    try:
+        found = inbox.scan(days=days)
+        added = inbox.store(db, found)
+    except Exception as exc:  # noqa: BLE001 - a dead token must not be a stack trace
+        return RedirectResponse("/job/alerts?error=" + quote(f"Gmail did not answer: {exc}")
+                                + "&error_title=" + quote("Could not sync"), status_code=303)
+
+    if not found:
+        note = (f"Nothing in the last {days} days. Either no alerts have arrived, or "
+                f"they are not being emailed to this address.")
+    elif added:
+        note = f"Read {len(found)}, {added} new."
+    else:
+        note = f"Read {len(found)}. Nothing new since the last pull."
+    return RedirectResponse("/job/alerts?message=" + quote(note), status_code=303)
 
 
 @router.post("/job/alerts/clear")

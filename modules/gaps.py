@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence
@@ -43,6 +44,36 @@ SEED_FILE = config.base_dir / "data" / "profile_facts.json"
 
 # how many of his facts a keyword's words have to touch before it is worth asking about
 LIKELY_TOUCHES = 2
+
+_OPTIONS_SYSTEM = f"""You turn a gap in someone's CV into a short list of statements they
+can tick, so that closing it costs a click rather than an evening of writing.
+
+{TRUTH_CONTRACT}
+
+{HOUSE_STYLE}
+
+They are shown a term a job wants that their record does not currently contain, and the
+parts of their record that sit closest to it. Write the two to four things a person with
+that record might truthfully have done, phrased as finished sentences in their voice.
+
+Rules that matter more than being helpful:
+- Every option must be a MODEST extension of a fact you were shown, not a new career.
+  Each one names the fact it extends
+- NEVER invent a number, a percentage, a client, a system name or a scale. A statement
+  they tick becomes a permanent fact in their record, and an invented figure discovered
+  in an interview discredits the whole document
+- Options must differ from each other in substance, not in wording. Three ways of saying
+  the same sentence is one option
+- If nothing in the record is genuinely near the term, return an empty list. Offering
+  someone a plausible sentence about work they have not done is the one thing this must
+  never do
+- Written as a statement of fact, first person implied, no hedging. "Ran X" not "Have
+  experience in X"
+
+Return JSON only, no prose, no code fence:
+{{"options": [{{"text": "one specific thing they did", "fact_ids": [12],
+               "why": "six words on what this evidences"}}]}}
+"""
 
 _SYSTEM = f"""You help someone describe work they have already done, in language a job
 description would recognise. You are writing a QUESTION, never a claim.
@@ -122,6 +153,80 @@ def closeability(keyword: str, facts: Sequence[Any]) -> str:
     if len(near) >= LIKELY_TOUCHES:
         return "likely"
     return "maybe" if near else "unlikely"
+
+
+@dataclass
+class Option:
+    """One tickable statement. Ticking it makes it a permanent, verified fact."""
+    text: str
+    fact_ids: List[int] = field(default_factory=list)
+    why: str = ""
+
+    def as_dict(self) -> Dict[str, Any]:
+        return {"text": self.text, "fact_ids": self.fact_ids, "why": self.why}
+
+
+_DIGITS = re.compile(r"\d[\d,.]*%?")
+
+
+def _figures_are_his(text: str, basis: Sequence[Any]) -> bool:
+    """No number may appear in an option that is not already in the fact it extends.
+
+    The free-text box never needed this: he typed his own numbers. A tickable statement
+    is different. It is one click from becoming a verified fact, and a plausible figure
+    is exactly what a model produces when asked to write a sentence about work it can
+    only see the outline of.
+    """
+    source = " ".join((getattr(f, "text", "") or "") + " " +
+                      " ".join(str(v) for v in (getattr(f, "metrics", None) or {}).values())
+                      for f in basis)
+    known = set(_DIGITS.findall(source))
+    return all(figure in known for figure in _DIGITS.findall(text or ""))
+
+
+def options(keyword: str, facts: Sequence[Any], role: str = "",
+            limit: int = 4) -> List[Option]:
+    """Statements he can tick to close one gap. Empty when nothing is genuinely near."""
+    near = adjacency(keyword, facts)[:5]
+    if not near or closeability(keyword, facts) == "unlikely":
+        return []
+
+    by_id = {f.id: f for f in facts}
+    listed = "\n".join(f"[{f.id}] {(f.text or '')[:220]}" for f in near)
+    user = (f"TERM THE JOB WANTS: {keyword}\n"
+            f"ROLE BEING APPLIED FOR: {role or 'unspecified'}\n\n"
+            f"CLOSEST THINGS ALREADY IN THEIR RECORD:\n{listed}\n\n"
+            f"Write the options.")
+    try:
+        data = complete_json("gaps", system=_OPTIONS_SYSTEM, user=user,
+                             max_tokens=1200, temperature=0.2)
+    except Exception as exc:  # noqa: BLE001 - a gap without options is not a failure
+        log.warning("gaps: could not draft options for %r: %s", keyword, exc)
+        return []
+
+    raw = (data or {}).get("options") if isinstance(data, dict) else None
+    out: List[Option] = []
+    for item in (raw or [])[: limit * 2]:
+        if not isinstance(item, dict):
+            continue
+        text = " ".join(str(item.get("text") or "").split())
+        if not (15 <= len(text) <= 260):
+            continue
+        ids = [i for i in (item.get("fact_ids") or []) if i in by_id]
+        basis = [by_id[i] for i in ids] or near
+        if not _figures_are_his(text, basis):
+            log.warning("gaps: dropped an option for %r, it invented a figure: %r",
+                        keyword, text[:70])
+            continue
+        if any(o.text.lower() == text.lower() for o in out):
+            continue
+        out.append(Option(text=text, fact_ids=ids,
+                          why=" ".join(str(item.get("why") or "").split())[:90]))
+        if len(out) >= limit:
+            break
+
+    log.info("gaps: %d option(s) for %r", len(out), keyword)
+    return out
 
 
 def suggest_one(keyword: str, facts: Sequence[Any], role: str = "") -> Suggestion:

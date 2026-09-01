@@ -165,5 +165,41 @@ check("it never leaves 0 to 100",
 check("bands split where they say they do",
       (inbox.band(75), inbox.band(45), inbox.band(20)) == ("green", "amber", "red"))
 
+print("\nstoring, so the screen does not wait on Gmail")
+# Reading the inbox took nine seconds on eighteen messages, because every one needs its
+# body fetched to find the links. Paying that on each visit makes it a screen he stops
+# opening, so the pull is a button and the screen reads what the pull kept.
+import sqlite3, tempfile  # noqa: E402
+from sqlalchemy import create_engine  # noqa: E402
+from sqlalchemy.orm import sessionmaker  # noqa: E402
+from database.models import AlertListing, Base, SyncState  # noqa: E402
+
+engine = create_engine("sqlite://")
+Base.metadata.create_all(engine)
+db = sessionmaker(bind=engine)()
+
+batch = [Listing("linkedin", "1", "u1", title="Data Analyst", location="Mumbai",
+                 received=datetime(2026, 9, 1)),
+         Listing("indeed", "2", "u2", title="Procurement Analyst", location="Remote",
+                 received=datetime(2026, 8, 30))]
+check("a first pull stores everything", inbox.store(db, batch) == 2)
+check("a second pull of the same adds nothing", inbox.store(db, batch) == 0)
+check("and one new job is one new row",
+      inbox.store(db, batch + [Listing("linkedin", "3", "u3", title="BI Analyst",
+                                       received=datetime(2026, 9, 2))]) == 1)
+
+back = inbox.stored(db)
+check("everything comes back", len(back) == 3, len(back))
+check("newest first", back[0].external_id == "3", [l.external_id for l in back])
+check("with its fields intact",
+      back[2].title == "Procurement Analyst" and back[2].location == "Remote",
+      (back[2].title, back[2].location))
+check("and the pull time is recorded", inbox.last_sync(db) is not None)
+
+# A job that has scrolled out of the last fortnight of mail should not vanish from the
+# screen while he still has it open.
+inbox.store(db, [Listing("linkedin", "1", "u1", title="Data Analyst")])
+check("an older job is not dropped by a newer pull", len(inbox.stored(db)) == 3)
+
 print(f"\n{passed} passed, {failed} failed")
 raise SystemExit(1 if failed else 0)
