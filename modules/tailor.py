@@ -520,6 +520,80 @@ def tailor(extraction: Any, facts: Sequence[Any],
     return result
 
 
+def _study_entry(facts: Sequence[Any], start: int, end: int) -> Optional[Role]:
+    """A dated entry for a study period, to sit in the experience run.
+
+    Better than moving the education section above experience, which was the first fix
+    and reads as an odd ordering. A reader who meets the gap and its explanation in the
+    same glance never forms the doubt, and the section order stays conventional.
+    """
+    degrees = [f for f in facts if getattr(f, "kind", "") == "education"]
+    if not degrees:
+        return None
+
+    def year(months_value: int) -> int:
+        return months_value // 12
+
+    names = []
+    for degree in degrees:
+        text = (getattr(degree, "text", "") or "").strip()
+        if text and text not in names:
+            names.append(text)
+    if not names:
+        return None
+
+    org = next((getattr(d, "org", "") for d in degrees if getattr(d, "org", "")), "")
+    return Role(
+        title="Full-time postgraduate study" if len(names) > 1 else names[0],
+        org=org,
+        dates=f"{_month_name(start)} - {_month_name(end)}",
+        location="",
+        bullets=[],
+        is_study=True,
+    )
+
+
+def _month_name(months_value: int) -> str:
+    return f"{_MONTHS[months_value % 12].title()} {months_value // 12}"
+
+
+def _insert_study(experience: List[Role], entry: Role, roles: Sequence[Any],
+                  gap) -> List[Role]:
+    """Put the study entry between the two roles it sits between, newest first."""
+    by_org = {}
+    today = date.today().year * 12 + date.today().month - 1
+    for role in roles:
+        by_org[role.org] = _as_months(getattr(role, "date_from", None), today)
+
+    out = []
+    placed = False
+    for role in experience:
+        start = by_org.get(role.org)
+        if not placed and start is not None and start <= gap[0]:
+            out.append(entry)
+            placed = True
+        out.append(role)
+    if not placed:
+        out.append(entry)
+    return out
+
+
+def _gap_between(roles: Sequence[Any], months: int = 6):
+    """The first break long enough for a reader to notice, as (start, end) in months."""
+    today = date.today().year * 12 + date.today().month - 1
+    spans = []
+    for role in roles:
+        begin = _as_months(getattr(role, "date_from", None), today)
+        finish = _as_months(getattr(role, "date_to", None), today)
+        if begin is not None:
+            spans.append((begin, finish if finish is not None else today))
+    spans.sort()
+    for i in range(len(spans) - 1):
+        if spans[i + 1][0] - spans[i][1] >= months:
+            return spans[i][1], spans[i + 1][0]
+    return None
+
+
 def _has_study_gap(roles: Sequence[Any], months: int = 6) -> bool:
     """Is there a break between roles long enough for a reader to notice?
 
@@ -636,10 +710,17 @@ def to_payload(
     if not name:
         name = next((f.text for f in facts if f.kind == "name"), "")
 
+    # A study period goes into the experience run at the point where the gap is.
+    gap = _gap_between(roles)
+    if gap:
+        entry = _study_entry(facts, gap[0], gap[1])
+        if entry:
+            experience = _insert_study(experience, entry, roles, gap)
+
     return ResumePayload(
         name=name,
         headline=(headline or "").strip(),
-        education_first=_has_study_gap(roles),
+        skill_groups=keywords.group_skills(skills),
         contact=contact,
         summary=summary,
         skills=skills,

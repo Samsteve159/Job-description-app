@@ -154,6 +154,65 @@ ok("a very long title is trimmed rather than refused",
    len(export_name("Jane Doe", "Manager " * 30, 1)) < 100,
    len(export_name("Jane Doe", "Manager " * 30, 1)))
 
+print("\nthe shape of the document, after reviewing one he wrote himself")
+from modules.render_docx import Role as R  # noqa: E402
+from modules.keywords import group_skills  # noqa: E402
+
+# Three labelled rows, not one run of twenty-four terms. This is where a filter looks
+# hardest and where a human's eye lands second, and a single pipe-separated line is
+# unreadable to one and undifferentiated to the other.
+rows = dict(group_skills(["SQL", "Power BI", "stakeholder management",
+                          "root cause analysis", "Python", "cost reduction"]))
+ok("skills are grouped by what they are", len(rows) == 3, list(rows))
+ok("tools land in the technical row", "SQL" in rows["Data & Technical"], rows)
+ok("methods land in the process row",
+   "root cause analysis" in rows["Program & Process"], rows)
+ok("people work lands in its own row",
+   "stakeholder management" in rows["Stakeholder & Delivery"], rows)
+# Losing a real skill to a tidy layout would be the wrong trade.
+kept = sum(len(v) for v in rows.values())
+ok("nothing is dropped to make the rows tidy", kept == 6, kept)
+ok("an unmatched term still appears",
+   any("Esperanto" in v for v in dict(group_skills(["Esperanto"])).values()),
+   group_skills(["Esperanto"]))
+
+# A study period sits in the experience run as a dated entry. Moving the education
+# section above experience was the first attempt and reads as an odd ordering; a reader
+# who meets the gap and its reason in one glance never forms the doubt.
+payload = ResumePayload(
+    name="Jane Doe", contact=["jane@x.com"],
+    summary="Spend analysis, SQL and UNSPSC categorisation.",
+    skill_groups=[("Data & Technical", ["SQL", "UNSPSC"])],
+    experience=[
+        R("Data Analyst", "Now Co", "Dec 2023 - Present", bullets=["Ran spend analysis in SQL against UNSPSC."]),
+        R("Full-time postgraduate study", "A University", "Oct 2021 - Dec 2023", is_study=True),
+        R("Treasury Analyst", "Then Co", "Apr 2018 - Oct 2021", bullets=["Built treasury dashboards."]),
+    ],
+    education=["Master of Business Analytics, A University, 2023"])
+path = render_resume(payload, OUT / "_shape.docx")
+text = str(audit(path)["text"])
+lines = [l.strip() for l in text.splitlines() if l.strip()]
+
+ok("the study entry is in the experience run",
+   "Full-time postgraduate study" in text)
+ok("and sits between the two roles it explains",
+   lines.index("Data Analyst | Now Co")
+   < lines.index("Full-time postgraduate study | A University")
+   < lines.index("Treasury Analyst | Then Co"))
+ok("education still has its own section at the end",
+   lines.index("EDUCATION") > lines.index("PROFESSIONAL EXPERIENCE"))
+ok("the skills row is labelled", "Data & Technical: SQL" in text, text[:200])
+# The middle dot his own PDF uses reads better and is refused here, because a parser that
+# mangles it turns a whole skills row into one unmatched token.
+ok("and separated with something a parser cannot mangle",
+   all(ord(c) < 128 for c in text), [c for c in text if ord(c) > 127][:4])
+ok("headings match the convention a parser knows",
+   all(h in text for h in ("SUMMARY", "CORE SKILLS", "PROFESSIONAL EXPERIENCE")))
+
+report = check(path, ["sql", "unspsc"], expect_roles=0)
+ok("and the whole thing still clears the parser", report.passed, report.blocking)
+(OUT / "_shape.docx").unlink(missing_ok=True)
+
 print("\ngate")
 try:
     gate(check(build(contact=["Mumbai"]), MUST, expect_roles=1))

@@ -776,3 +776,58 @@ def weights(jd_text: str, title: str, terms: Sequence[str]) -> Dict[str, float]:
             weight *= TITLE_MULTIPLIER
         out[term] = weight
     return out
+
+
+# ------------------------------------------------------------------ skill grouping
+#
+# Three labelled rows rather than one pipe-separated line. The skills block is where a
+# filter looks hardest and where a human's eye lands second, and a single run of
+# twenty-four terms is unreadable to one and undifferentiated to the other.
+#
+# Grouped by what the term IS, deterministically. A model asked to group them would
+# occasionally move a term between runs, and a resume that reshuffles itself between two
+# builds of the same job is one he cannot check.
+
+SKILL_GROUPS = (
+    ("Program & Process", (
+        "program", "programme", "project", "process", "delivery", "roadmap", "governance",
+        "improvement", "reengineering", "re-engineering", "root", "defect", "control",
+        "sop", "lean", "kaizen", "dmaic", "sourcing", "procurement", "category",
+        "supplier", "contract", "spend", "cost", "saving", "optimisation", "compliance",
+        "risk", "audit", "quality", "transformation", "change", "operations",
+    )),
+    ("Stakeholder & Delivery", (
+        "stakeholder", "executive", "leadership", "communication", "presentation",
+        "influencing", "cross-functional", "requirement", "coordination", "partner",
+        "consulting", "advisory", "negotiation", "training", "reporting",
+    )),
+    ("Data & Technical", (
+        "sql", "python", "excel", "vba", "powerbi", "tableau", "knime", "dbt", "sas",
+        "r", "git", "databricks", "sqlserver", "ml", "llm", "ai", "genai", "chatgpt",
+        "claude", "nlp", "tensorflow", "keras", "data", "analytics", "analyses",
+        "dashboard", "warehouse", "warehousing", "modelling", "pipeline", "automation",
+        "visualisation", "statistics", "forecasting", "bi", "etl", "unspsc", "taxonomies",
+    )),
+)
+
+
+def group_skills(skills: Sequence[str]) -> List[Any]:
+    """Sort the skills line into labelled rows, keeping the order within each.
+
+    A term that matches nothing joins the last group rather than being dropped or given a
+    row of its own. Losing a real skill to a tidy layout would be the wrong trade, and a
+    row called Other tells a reader nothing.
+    """
+    buckets: Dict[str, List[str]] = {label: [] for label, _ in SKILL_GROUPS}
+    fallback = SKILL_GROUPS[-1][0]
+
+    for skill in skills:
+        words = set(significant(skill)) | {canonical(w) for w in _WORD.findall(skill.lower())}
+        placed = None
+        for label, markers in SKILL_GROUPS:
+            if words & {canonical(m) for m in markers}:
+                placed = label
+                break
+        buckets[placed or fallback].append(skill)
+
+    return [(label, buckets[label]) for label, _ in SKILL_GROUPS if buckets[label]]

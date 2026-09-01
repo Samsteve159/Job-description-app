@@ -37,9 +37,9 @@ MUTED = RGBColor(0x44, 0x4C, 0x55)
 
 SECTION_ORDER = ["summary", "skills", "experience", "education", "certifications"]
 SECTION_HEADINGS = {
-    "summary": "PROFESSIONAL SUMMARY",
-    "skills": "SKILLS",
-    "experience": "EXPERIENCE",
+    "summary": "SUMMARY",
+    "skills": "CORE SKILLS",
+    "experience": "PROFESSIONAL EXPERIENCE",
     "education": "EDUCATION",
     "certifications": "CERTIFICATIONS",
 }
@@ -91,6 +91,10 @@ class Role:
     dates: str
     location: str = ""
     bullets: List[str] = field(default_factory=list)
+    # A study period sits in the experience run as a dated entry rather than being left
+    # for the education section to explain from the bottom of page two. A reader who
+    # meets the gap and its reason in the same glance never forms the doubt.
+    is_study: bool = False
 
 
 @dataclass
@@ -103,11 +107,12 @@ class ResumePayload:
     headline: str = ""
     summary: str = ""
     skills: List[str] = field(default_factory=list)
+    # [(label, [term, term]), ...]. Three or four labelled rows read better and screen
+    # better than one long pipe-separated line, which is where a filter looks hardest.
+    skill_groups: List[Any] = field(default_factory=list)
     experience: List[Role] = field(default_factory=list)
     education: List[str] = field(default_factory=list)
     certifications: List[str] = field(default_factory=list)
-    # set when a study period accounts for a gap between roles
-    education_first: bool = False
 
 
 def export_name(name: str, title: str, package_id: Optional[int] = None,
@@ -232,29 +237,26 @@ def render_resume(payload: ResumePayload, out_path: Path) -> Path:
         _heading(doc, SECTION_HEADINGS["summary"])
         _line(doc, payload.summary)
 
-    if payload.skills:
+    if payload.skill_groups or payload.skills:
         _heading(doc, SECTION_HEADINGS["skills"])
-        _line(doc, " | ".join(payload.skills))
-
-    # Education before experience when it accounts for a gap. A reader gives the top of
-    # the page about ten seconds, and a two-year hole between roles is read as
-    # unexplained for the whole of it if the two master's degrees that fill it are at the
-    # bottom of page two. Ordinarily experience leads, because it is what they are buying.
-    if payload.education_first and payload.education:
-        _heading(doc, SECTION_HEADINGS["education"])
-        for item in payload.education:
-            _line(doc, item)
+        if payload.skill_groups:
+            for label, terms in payload.skill_groups:
+                if terms:
+                    _line(doc, f"{label}: " + " | ".join(terms))
+        else:
+            _line(doc, " | ".join(payload.skills))
 
     if payload.experience:
         _heading(doc, SECTION_HEADINGS["experience"])
         for role in payload.experience:
-            _line(doc, f"{role.title}, {role.org}", bold=True, space_before=8)
-            meta = role.dates if not role.location else f"{role.dates} | {role.location}"
+            heading = f"{role.title}  |  {role.org}" if role.org else role.title
+            _line(doc, heading, bold=True, space_before=8)
+            meta = role.dates if not role.location else f"{role.dates}  |  {role.location}"
             _line(doc, meta, muted=True)
             for bullet in role.bullets:
                 _bullet(doc, bullet)
 
-    if payload.education and not payload.education_first:
+    if payload.education:
         _heading(doc, SECTION_HEADINGS["education"])
         for item in payload.education:
             _line(doc, item)
