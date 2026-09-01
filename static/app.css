@@ -343,6 +343,11 @@ select {
 .verdict-red   { background: var(--red-soft); border-color: var(--red); }
 .verdict-red .verdict-call { color: var(--red); }
 
+.theme-toggle {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 32px; height: 32px; padding: 0; line-height: 0;
+}
+
 .fit-top { display: flex; gap: 22px; align-items: center; flex-wrap: wrap; }
 .fit-dial {
   width: 104px; height: 104px; border-radius: 50%;

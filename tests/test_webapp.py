@@ -196,8 +196,14 @@ with TestClient(app) as client:
     check("and it stops moving if the viewer asked for less motion",
           "prefers-reduced-motion" in css)
 
-    check("the theme control says what it is, not just its state",
-          "Theme: " in r.text and 'title=' in r.text)
+    # An icon now, not a word. Which means the label has to live somewhere a person can
+    # still reach, so the tooltip carries both the state and what clicking does.
+    home = client.get("/job").text
+    check("the theme control is an icon", "themeIcon" in home and ">Theme<" not in home)
+    check("with all three states drawn",
+          all(k in home for k in ("light:", "dark:", "system:")), )
+    check("and a label for anyone who cannot see it",
+          'aria-label="Theme"' in home and "Click to force dark" in home)
 
     print("\ninput handling")
     r = client.post("/job/writer/analyse", data={"url": "", "job_text": ""},

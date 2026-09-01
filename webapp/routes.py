@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import hashlib
 import time
+from datetime import timezone
 from urllib.parse import quote
 import logging
 from datetime import date
@@ -58,6 +59,23 @@ _STATUS_CLASS = {
 templates.env.filters["status_of"] = lambda package, keys: tracker.display_status(
     package, keys or set())
 templates.env.filters["status_class"] = lambda status: _STATUS_CLASS.get(status, "section")
+
+
+def _local(value: Any, fmt: str = "%d %b, %H:%M") -> str:
+    """A time in his timezone, not the server's idea of one.
+
+    Gmail hands back UTC and the screen printed it raw, so an email that reached him at
+    half past eight this morning read as yesterday evening. He is ten hours ahead of UTC
+    and correctly concluded the pull was stale.
+    """
+    if value is None:
+        return ""
+    if value.tzinfo is None:
+        value = value.replace(tzinfo=timezone.utc)
+    return value.astimezone().strftime(fmt)
+
+
+templates.env.filters["local"] = _local
 router = APIRouter()
 
 OUTPUT_DIR = BASE_DIR / "data" / "output"
@@ -931,7 +949,7 @@ def alerts(request: Request, db: Session = Depends(get_db), days: int = 14,
 
     return render(request, "alerts.html", section="alerts", days=days, rows=rows,
                   listings=listings, off_target=inbox.off_target(listings),
-                  cleared_count=len(cleared), last_sync=inbox.last_sync(db),
+                  last_sync=inbox.last_sync(db),
                   message=message or None, error=error or None,
                   error_title=error_title or None)
 
@@ -978,15 +996,6 @@ def alerts_clear(db: Session = Depends(get_db), key: List[str] = Form(default=[]
         db.add(DismissedAlert(key=k, label=label[index] if index < len(label) else None))
     db.commit()
     log.info("alerts: cleared %d row(s)", len(keys))
-    return RedirectResponse("/job/alerts", status_code=303)
-
-
-@router.post("/job/alerts/restore")
-def alerts_restore(db: Session = Depends(get_db)):
-    """Put everything back. Clearing eighteen rows by accident should cost one click."""
-    count = db.query(DismissedAlert).delete()
-    db.commit()
-    log.info("alerts: restored %d cleared row(s)", count)
     return RedirectResponse("/job/alerts", status_code=303)
 
 

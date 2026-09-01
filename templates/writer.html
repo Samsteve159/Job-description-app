@@ -63,7 +63,7 @@
         {% if spec %}
           <span style="flex: 1; min-width: 180px;">{{ spec.name }}
             <span class="hint">&middot; {{ (spec.rules.banned or [])|length }} banned phrase(s)
-              &middot; {{ spec.created_at.strftime('%d %b') }}</span></span>
+              &middot; {{ spec.created_at | local('%d %b') }}</span></span>
           <form method="post" action="/job/writer/spec/remove">
             <input type="hidden" name="kind" value="{{ kind }}">
             <button type="submit" class="danger">Switch off</button>
@@ -112,7 +112,7 @@
         </td>
         {% set shown = p | status_of(applied_keys) %}
         <td><span class="badge {{ shown | status_class }}">{{ shown }}</span></td>
-        <td style="color: var(--muted);">{{ p.created_at.strftime('%d %b, %H:%M') }}</td>
+        <td style="color: var(--muted);">{{ p.created_at | local }}</td>
         <td style="text-align: right; white-space: nowrap;">
           <a href="/job/writer/{{ p.id }}">Open</a>
           <form method="post" action="/job/writer/{{ p.id }}/remove" style="display: inline;">

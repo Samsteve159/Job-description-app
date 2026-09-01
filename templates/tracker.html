@@ -35,7 +35,7 @@
           {% if a.id in stale_ids %}<span class="badge blocked" style="margin-left: 6px;">quiet</span>{% endif %}
         </td>
         <td>{{ a.company or '' }}</td>
-        <td style="color: var(--muted); white-space: nowrap;">{{ a.applied_at.strftime('%d %b') if a.applied_at }}</td>
+        <td style="color: var(--muted); white-space: nowrap;">{{ a.applied_at | local('%d %b') }}</td>
         <td><span class="badge section">{{ a.source.replace('_', ' ') }}</span></td>
         <td>
           <form method="post" action="/job/tracker/status" style="display: flex; gap: 6px;">

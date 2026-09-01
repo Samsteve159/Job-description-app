@@ -17,11 +17,6 @@
     </button>
   </form>
   <span style="flex: 1;"></span>
-  {% if cleared_count %}
-    <form method="post" action="/job/alerts/restore">
-      <button type="submit" class="secondary">Bring back {{ cleared_count }} cleared</button>
-    </form>
-  {% endif %}
   {% if rows %}
     <form method="post" action="/job/alerts/clear" id="clearAll">
       {% for r in rows %}
@@ -37,7 +32,7 @@
   {{ rows|length }} job{{ '' if rows|length == 1 else 's' }} from your alerts, best match
   first.
   {% if last_sync %}
-    <span class="hint">Last synced {{ last_sync.strftime('%d %b, %H:%M') }} UTC.</span>
+    <span class="hint">Last synced {{ last_sync | local }}.</span>
   {% else %}
     <span class="hint">Never synced. Press Sync to read your inbox.</span>
   {% endif %}
@@ -66,7 +61,7 @@
         <span class="block-text">{{ r.listing.label }}</span>
         <span class="hint" style="display: block; margin-top: 2px;">
           {{ r.listing.source }} &middot; {{ r.listing.location or 'location not given' }}
-          {%- if r.listing.received %} &middot; {{ r.listing.received.strftime('%d %b') }}{% endif %}
+          {%- if r.listing.received %} &middot; {{ r.listing.received | local('%d %b') }}{% endif %}
         </span>
       </span>
       {% if r.listing.url %}
