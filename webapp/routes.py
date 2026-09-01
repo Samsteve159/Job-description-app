@@ -30,6 +30,7 @@ from database.models import (DismissedAlert, GeneratedBlock, Package,
                              ProfileFact)
 from modules import cover, fit, gaps, tracker
 from modules import contact as contact_module
+from modules import design
 from modules import intake
 from modules.ats import AtsBlocked, check as ats_check
 from modules.extract import Extraction, NotAJobDescription, extract
@@ -144,9 +145,17 @@ def tracker_remove(db: Session = Depends(get_db), application_id: int = Form(...
 
 @router.get("/job/writer")
 def writer_form(request: Request, db: Session = Depends(get_db), error: str = ""):
-    packages = db.query(Package).filter(Package.status != "deleted").order_by(Package.created_at.desc()).limit(10).all()
-    return render(request, "writer.html", section="writer", _db=db,
-                  packages=packages, error=error or None)
+    return _writer_view(request, db, error=error)
+
+
+def _writer_view(request: Request, db: Session, **kw):
+    packages = (db.query(Package).filter(Package.status != "deleted")
+                .order_by(Package.created_at.desc()).limit(10).all())
+    context = dict(packages=packages,
+                   resume_spec=design.active(db, "resume"),
+                   cover_spec=design.active(db, "cover"))
+    context.update({k: (v or None) for k, v in kw.items()})
+    return render(request, "writer.html", section="writer", _db=db, **context)
 
 
 @router.post("/job/writer/analyse")
@@ -207,7 +216,8 @@ def analyse(request: Request, db: Session = Depends(get_db),
 
     try:
         t0 = time.monotonic()
-        result = tailor(extraction, facts)
+        result = tailor(extraction, facts,
+                        house_spec=design.instruction(db, "resume"))
         log.info("analyse: tailor took %.1fs", time.monotonic() - t0)
     except (LLMError, RuntimeError) as exc:
         return render(request, "writer.html", section="writer", url=url, job_text=text,
@@ -215,6 +225,20 @@ def analyse(request: Request, db: Session = Depends(get_db),
                       error_title="The writer stage failed",
                       packages=db.query(Package).filter(Package.status != "deleted").order_by(
                           Package.created_at.desc()).limit(10).all())
+
+    # A prompt is advisory. Every list of forbidden wording in this app has eventually
+    # been ignored by some model on some run, so the spec's banned phrases are checked
+    # here too, and anything carrying one is downgraded for him to look at rather than
+    # rendered.
+    spec = design.active(db, "resume")
+    if spec and spec.rules:
+        for block in result.blocks:
+            hits = design.violations(block.text, spec.rules)
+            if hits and block.grade == "verified":
+                block.grade = "inferred"
+                block.accepted = False
+                block.rationale = ((block.rationale or "") +
+                                   f" Your spec bans: {', '.join(hits)}.").strip()
 
     package = Package(
         job_text=text,
@@ -489,7 +513,8 @@ def rewrite(request: Request, package_id: int, db: Session = Depends(get_db)):
 
     try:
         t0 = time.monotonic()
-        result = tailor(extraction, facts)
+        result = tailor(extraction, facts,
+                        house_spec=design.instruction(db, "resume"))
         log.info("analyse: tailor took %.1fs", time.monotonic() - t0)
     except (LLMError, RuntimeError) as exc:
         return _package_view(request, db, package, error=str(exc),
@@ -569,7 +594,8 @@ def cover_write(request: Request, package_id: int, db: Session = Depends(get_db)
     ).order_by(GeneratedBlock.order_index).all()
 
     try:
-        letter = cover.write(extraction, facts, resume_blocks=written)
+        letter = cover.write(extraction, facts, resume_blocks=written,
+                             house_spec=design.instruction(db, "cover"))
     except (LLMError, RuntimeError) as exc:
         return _package_view(request, db, package, error=str(exc),
                              error_title="Could not draft the letter")
@@ -721,6 +747,43 @@ def _details_view(request: Request, db: Session, **kw):
     )
     context.update({k: (v or None) for k, v in kw.items()})
     return render(request, "details.html", section="details", _db=db, **context)
+
+
+@router.post("/job/writer/spec")
+async def writer_spec(request: Request, db: Session = Depends(get_db),
+                      kind: str = Form("resume"), upload: UploadFile = File(...)):
+    """Upload a house spec. It joins the instruction the writer gets from the next run."""
+    suffix = Path(upload.filename or "").suffix.lower()
+    tmp = OUTPUT_DIR / f"_spec{suffix or '.md'}"
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    tmp.write_bytes(await upload.read())
+    try:
+        text = intake.read(tmp)
+        spec = design.save(db, kind, Path(upload.filename or "spec").stem, text)
+    except (intake.UnreadableFile, ValueError) as exc:
+        return _writer_view(request, db, error=str(exc),
+                            error_title="Could not use that spec")
+    finally:
+        tmp.unlink(missing_ok=True)
+
+    banned = len((spec.rules or {}).get("banned") or [])
+    return _writer_view(
+        request, db,
+        message=f"{kind.title()} spec \u201c{spec.name}\u201d is now in force. "
+                f"{banned} banned phrase(s) will be checked in code as well as asked for "
+                f"in the prompt.")
+
+
+@router.post("/job/writer/spec/remove")
+def writer_spec_remove(request: Request, db: Session = Depends(get_db),
+                       kind: str = Form(...)):
+    from database.models import DesignSpec
+    for row in db.query(DesignSpec).filter(DesignSpec.kind == kind,
+                                           DesignSpec.active.is_(True)).all():
+        row.active = False
+    db.commit()
+    return _writer_view(request, db, message=f"{kind.title()} spec switched off. "
+                                             f"House defaults apply again.")
 
 
 @router.post("/job/details/import")

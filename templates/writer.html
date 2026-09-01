@@ -47,6 +47,57 @@
   About thirty seconds either way. Two model calls, both on the free tier.
 </p>
 
+<!-- ------------------------------------------------------------ house spec -->
+<div class="panel">
+  <div style="display: flex; gap: 14px; align-items: baseline; flex-wrap: wrap;">
+    <h2 style="margin: 0;">House spec</h2>
+    <span style="flex: 1;"></span>
+    <button type="button" class="secondary" onclick="
+      var b = document.getElementById('specBox');
+      b.style.display = b.style.display === 'none' ? 'block' : 'none';">Upload a spec</button>
+  </div>
+  <p class="hint" style="margin: 8px 0 0;">
+    How your documents should be written, in your words. It joins the instruction the
+    writer gets, and any wording the spec bans is checked in code afterwards rather than
+    only asked for. It cannot authorise a claim: the truth gates sit above it.
+  </p>
+
+  <div style="margin-top: 10px;">
+    {% for label, kind, spec in (('Resume', 'resume', resume_spec), ('Cover letter', 'cover', cover_spec)) %}
+      <div style="display: flex; gap: 10px; align-items: baseline; padding: 7px 0;
+                  border-bottom: 1px solid var(--rule);">
+        <span style="min-width: 110px; font-weight: 600;">{{ label }}</span>
+        {% if spec %}
+          <span style="flex: 1;">{{ spec.name }}
+            <span class="hint">&middot; {{ (spec.rules.banned or [])|length }} banned phrase(s)
+              &middot; {{ spec.created_at.strftime('%d %b') }}</span></span>
+          <form method="post" action="/job/writer/spec/remove">
+            <input type="hidden" name="kind" value="{{ kind }}">
+            <button type="submit" class="danger">Switch off</button>
+          </form>
+        {% else %}
+          <span style="flex: 1;" class="hint">None. House defaults apply.</span>
+        {% endif %}
+      </div>
+    {% endfor %}
+  </div>
+
+  <div id="specBox" style="display: none; margin-top: 14px;">
+    <form method="post" action="/job/writer/spec" enctype="multipart/form-data">
+      <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
+        <select name="kind">
+          <option value="resume">Resume spec</option>
+          <option value="cover">Cover letter spec</option>
+        </select>
+        <input type="file" name="upload" accept=".md,.markdown,.txt,.pdf" required>
+        <button type="submit">Apply it</button>
+      </div>
+      <p class="hint">Markdown, text or PDF. Replacing one keeps the old version rather
+        than deleting it, so a change that makes the output worse can be undone.</p>
+    </form>
+  </div>
+</div>
+
 {% if packages %}
 <h2>Earlier packages</h2>
 <div class="panel tight">

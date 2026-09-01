@@ -58,7 +58,21 @@ _EQUIVALENTS: List[Set[str]] = [
     {"modelling", "modeling", "model", "models"},
     {"categorisation", "categorization", "categorised", "categorized", "categories",
      "category"},
-    {"optimisation", "optimization", "optimised", "optimized"},
+    {"optimisation", "optimization", "optimised", "optimized", "optimise", "optimize"},
+    # The -isation family. A posting asks for "standardisation" against a record saying
+    # "standardised" and the two never met, because canonicalising the spelling still
+    # leaves a noun facing a verb.
+    {"standardisation", "standardization", "standardised", "standardized",
+     "standardise", "standardize", "standard", "standards"},
+    {"centralisation", "centralization", "centralised", "centralized", "centralise"},
+    {"normalisation", "normalization", "normalised", "normalized", "normalise"},
+    {"prioritisation", "prioritization", "prioritised", "prioritized", "prioritise"},
+    {"rationalisation", "rationalization", "rationalised", "rationalized"},
+    {"harmonisation", "harmonization", "harmonised", "harmonized"},
+    {"digitisation", "digitization", "digitised", "digitized", "digital"},
+    {"consolidation", "consolidated", "consolidate", "consolidating"},
+    {"integration", "integrated", "integrate", "integrating"},
+    {"migration", "migrated", "migrate", "migrating"},
     {"visualisation", "visualization", "visualisations", "visualizations"},
     {"automation", "automated", "automating", "automate"},
     {"transformation", "transforming", "transform", "transformations"},

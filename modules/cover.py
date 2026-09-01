@@ -197,7 +197,8 @@ Return JSON only, no prose, no code fence:
 
 
 def write(extraction: Any, facts: Sequence[Any],
-          resume_blocks: Optional[Sequence[Any]] = None) -> CoverLetter:
+          resume_blocks: Optional[Sequence[Any]] = None,
+          house_spec: str = "") -> CoverLetter:
     """Draft a cover letter for one job. Nothing here trusts the model."""
     known = {f.id: f for f in facts}
     if not known:
@@ -225,7 +226,7 @@ def write(extraction: Any, facts: Sequence[Any],
         + f"FACTS (cite these by the id in square brackets):\n{_facts_for(citable)}"
     )
 
-    data = complete_json("cover", system=_SYSTEM, user=user,
+    data = complete_json("cover", system=_SYSTEM + (house_spec or ""), user=user,
                          max_tokens=4000, temperature=0.4)
     if not isinstance(data, dict):
         raise RuntimeError(f"cover returned {type(data).__name__}, expected an object")

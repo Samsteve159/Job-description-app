@@ -3,7 +3,7 @@
 Two families of tables that must never touch each other:
 
   Sections 1 and 2 (Resume & Cover Writer, and the application tracker)
-      ContactDetail, DismissedAlert, ProfileFact, Requirement, Package, GeneratedBlock,
+      ContactDetail, DesignSpec, DismissedAlert, ProfileFact, Requirement, Package, GeneratedBlock,
       Application
 
   Section 3 (Interview Brief) -- fully standalone
@@ -95,6 +95,28 @@ class DismissedAlert(Base):
     id = Column(Integer, primary_key=True)
     key = Column(String(128), nullable=False, unique=True, index=True)
     label = Column(Text, nullable=True)          # kept so a mistake is recoverable
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class DesignSpec(Base):
+    """A house style for the resume or the cover letter, in his words.
+
+    Design conventions move. What an ATS forgives, what an LLM screener flags as
+    machine-written, how long a document should be at his band: all of it changed inside
+    a year. Hard-coding that into prompts means editing Python to change a house rule, so
+    it lives here instead and he replaces it by uploading a new one.
+
+    Only one spec of each kind is active. Superseded ones are kept, not deleted, because
+    a change that makes the output worse has to be reversible.
+    """
+    __tablename__ = "design_specs"
+
+    id = Column(Integer, primary_key=True)
+    kind = Column(String(16), nullable=False, index=True)      # resume | cover
+    name = Column(String(200), nullable=False)
+    text = Column(Text, nullable=False)
+    rules = Column(JSON, default=dict)        # what was read out of it deterministically
+    active = Column(Boolean, default=True, index=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
 

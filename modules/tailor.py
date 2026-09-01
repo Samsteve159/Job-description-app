@@ -348,7 +348,8 @@ def _coerce_bullets(raw: Any, org: str, known: Dict[int, Any]) -> List[Block]:
 
 # ------------------------------------------------------------------------------ public
 
-def tailor(extraction: Any, facts: Sequence[Any]) -> TailorResult:
+def tailor(extraction: Any, facts: Sequence[Any],
+           house_spec: str = "") -> TailorResult:
     """Produce graded blocks for one job. Nothing here trusts the model."""
     known = {f.id: f for f in facts}
     if not known:
@@ -391,7 +392,8 @@ def tailor(extraction: Any, facts: Sequence[Any]) -> TailorResult:
     # cannot follow a schema. It was a budget, not a capability. Claude writes more
     # blocks than the NIM models for the same input, so the ceiling has to fit the most
     # verbose model on the list, not the one currently routed.
-    data = complete_json("tailor", system=_SYSTEM, user=user, max_tokens=12000, temperature=0.3)
+    data = complete_json("tailor", system=_SYSTEM + (house_spec or ""), user=user,
+                         max_tokens=12000, temperature=0.3)
     if not isinstance(data, dict):
         raise RuntimeError(f"tailor returned {type(data).__name__}, expected an object")
 

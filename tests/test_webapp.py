@@ -158,7 +158,7 @@ with TestClient(app) as client:
     # Counted within the two analyse forms, not across the page. The packages table
     # below them now carries a Clear button per row, and a page-wide count made this
     # assertion fail for a reason that had nothing to do with the analyse screen.
-    top = r.text.split("Earlier packages")[0]
+    top = r.text.split("House spec")[0]
     buttons = top.count('type="submit"')
     check("and each has exactly one submit", buttons == 2, buttons)
     check("the link form submits on its own", 'id="urlGo"' in r.text)
