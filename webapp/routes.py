@@ -77,12 +77,44 @@ def home():
 
 
 @router.get("/job")
-def dashboard(request: Request, db: Session = Depends(get_db)):
+def dashboard(request: Request, db: Session = Depends(get_db), message: str = ""):
     """The landing screen. Numbers first, drafts underneath."""
+    from modules import gmail
     return render(request, "dashboard.html", section="dashboard", _db=db,
-                  stats=tracker.stats(db), gmail_ready=False,
+                  stats=tracker.stats(db), gmail_ready=gmail.connected(),
+                  message=message or None,
                   packages=db.query(Package).filter(Package.status != "deleted").order_by(
                       Package.created_at.desc()).limit(8).all())
+
+
+@router.post("/job/scan")
+def scan_inbox(db: Session = Depends(get_db)):
+    """Read the acknowledgements employers sent and count them as applications.
+
+    Not run on every dashboard load. It costs a Gmail round trip per candidate message,
+    and a landing screen that takes four seconds to appear is a landing screen he stops
+    opening.
+    """
+    from modules import applications, gmail
+
+    if not gmail.connected():
+        return RedirectResponse("/job?message=" + quote(
+            "Gmail is not connected. Run python3 scripts/gmail_auth.py"), status_code=303)
+    try:
+        found = applications.scan(days=60)
+        added = applications.record(db, found)
+    except Exception as exc:  # noqa: BLE001 - a dead token must not be a stack trace
+        return RedirectResponse("/job?message=" + quote(f"Could not read your inbox: {exc}"),
+                                status_code=303)
+
+    if not found:
+        note = ("No application confirmations in the last 60 days. Employers usually "
+                "acknowledge within minutes, so this means none have arrived yet.")
+    elif added:
+        note = f"Found {len(found)}, {added} new. The rest were already counted."
+    else:
+        note = f"Found {len(found)}, all of them already counted."
+    return RedirectResponse("/job?message=" + quote(note), status_code=303)
 
 
 @router.get("/posts")
@@ -751,7 +783,7 @@ def _details_view(request: Request, db: Session, **kw):
 
 @router.post("/job/writer/spec")
 async def writer_spec(request: Request, db: Session = Depends(get_db),
-                      kind: str = Form("resume"), upload: UploadFile = File(...)):
+                      kind: str = Form(...), upload: UploadFile = File(...)):
     """Upload a house spec. It joins the instruction the writer gets from the next run."""
     suffix = Path(upload.filename or "").suffix.lower()
     tmp = OUTPUT_DIR / f"_spec{suffix or '.md'}"

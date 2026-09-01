@@ -39,12 +39,26 @@ MAX_CHARS = 40_000
 # cases, sections the document is required to have. Banning the word "Experience" would
 # have blocked every resume it ever wrote. Only lists that are explicitly about wording
 # are read.
-_BANNED_BLOCK = re.compile(
-    r"banned constructions?\s*:?[^\n]*\n((?:\s*[-*•][^\n]*\n?)+)", re.I)
-_INLINE_LIST = re.compile(
-    r"(?:filler (?:adjectives?|verbs?)|banned openings?)\s*:?\s*([^\n]+)", re.I)
+# "Banned" is about wording in both his specs; "Forbidden" is about structure. Matching
+# the first and not the second is what keeps section headings out of the ban list.
+# The label must open a line. Matching "banned" anywhere pulled in prose like "not on the
+# banned list in section 5" and turned "per section 6" into a forbidden phrase.
+_LABEL = (r"^\s*[-*•]?\s*\*{0,2}"
+          r"(?:banned[a-z ]{0,20}|filler (?:adjectives?|verbs?))\*{0,2}\s*:\*{0,2}")
+_BANNED_BLOCK = re.compile(_LABEL + r"[^\n]*\n((?:\s*[-*\u2022][^\n]*\n?)+)", re.I | re.M)
+_INLINE_LIST = re.compile(_LABEL + r"[ \t]*([^\n]+)", re.I | re.M)
+
+# A quoted string in a spec is a literal phrase to refuse. Unquoted items are single
+# words or short constructions, and anything longer than that is prose describing a rule.
+_QUOTED = re.compile(r"[\"\u201c]([^\"\u201d]{3,80})[\"\u201d]")
 
 # A word the document cannot do without, whatever a spec seems to say about it.
+# Cross-references and fragments of prose, which a list of phrases will always pick up
+# some of and which are never actually forbidden wording.
+_JUNK = re.compile(
+    r"\bsection\b|\bspec\b|^\W*$|^\d|\bapplies\b|\babsent\b"
+    r"|^(?:its|the|and|any|a|an|of|to|in|or)$", re.I)
+
 _NEVER_BAN = {
     "summary", "experience", "education", "skills", "certifications", "projects",
     "contact", "name", "dates", "single column", "top to bottom", "whole-document",
@@ -53,14 +67,23 @@ _NEVER_BAN = {
 
 
 def _terms(fragment: str) -> List[str]:
+    fragment = fragment or ""
+
+    # Quoted first. His cover spec bans whole closings, "Thank you for your time and
+    # consideration", which no word-count rule would ever have let through.
+    quoted = [q.strip().lower() for q in _QUOTED.findall(fragment)]
+    if quoted:
+        return [q for q in quoted
+                if 3 <= len(q) <= 80 and q not in _NEVER_BAN and not _JUNK.search(q)]
+
     out = []
-    for piece in re.split(r"[,\n•·]|\s{2,}", fragment or ""):
+    for piece in re.split(r"[,\n\u2022\u00b7]|\s{2,}", fragment):
         piece = piece.strip().strip(' -*."\u201c\u201d\'`').strip()
         # a list of banned words is words, not sentences
         piece = piece.lower()
         if not (2 <= len(piece) <= 40) or piece.endswith(":") or len(piece.split()) > 4:
             continue
-        if piece in _NEVER_BAN:
+        if piece in _NEVER_BAN or _JUNK.search(piece):
             continue
         out.append(piece)
     return out

@@ -62,13 +62,27 @@
   </div>
 </div>
 
-{% if not gmail_ready %}
+{% if gmail_ready %}
+<div class="panel tight">
+  <div style="display: flex; gap: 14px; align-items: baseline; flex-wrap: wrap;">
+    <span style="flex: 1; min-width: 220px;">
+      <strong style="color: var(--ink); font-size: 14px;">Count what you have applied to</strong>
+      <span class="hint" style="display: block; margin-top: 4px;">
+        Employers acknowledge within minutes, so the record is already in your inbox.
+        This reads those confirmations and counts them. Run it whenever you have applied.
+      </span>
+    </span>
+    <form method="post" action="/job/scan">
+      <button type="submit">Check my inbox</button>
+    </form>
+  </div>
+</div>
+{% else %}
 <div class="panel tight" style="border-left: 3px solid var(--amber);">
   <strong style="color: var(--ink); font-size: 14px;">Counting is manual for now</strong>
   <p class="hint" style="margin-top: 4px;">
     Reading applications out of Gmail needs a Google Cloud project and an OAuth client
-    that only you can create. Until then the Tracker takes entries by hand, and building
-    a resume offers to log one for you.
+    that only you can create. Until then the Tracker takes entries by hand.
   </p>
 </div>
 {% endif %}
