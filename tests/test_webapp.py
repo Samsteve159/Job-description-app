@@ -353,5 +353,23 @@ with TestClient(app) as client:
                     follow_redirects=True)
     check("an empty value is refused", "cannot be empty" in r.text)
 
+    print("\nloading skeleton")
+    page = client.get("/job").text
+    check("every page carries the shared skeleton", "showPageSkeleton" in page)
+    check("it hides main rather than replacing it",
+          'main.style.display = "none"' in page
+          and "insertBefore(panel, main)" in page
+          and "main.innerHTML =" not in page,
+          "replacing main mid-submit abandons the navigation")
+    check("it stands down for the writer's own", 'data-analyse' in page)
+    check("a download link never gets one", '"/download"' in page)
+    check("nor does a link that leaves the app", "a.origin !== window.location.origin" in page)
+    check("a frozen skeleton is cleared on a back navigation", "e.persisted" in page)
+    css = client.get("/static/app.css").text
+    check("the skeleton shapes are styled", ".sk-page" in css and ".sk-card" in css)
+    check("and stop moving when the OS asks them to",
+          "prefers-reduced-motion" in css)
+
+
 print(f"\n{passed} passed, {failed} failed")
 raise SystemExit(1 if failed else 0)

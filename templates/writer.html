@@ -200,6 +200,9 @@
   // screen blames a model call that was never made. So main is hidden, never replaced,
   // and the skeleton goes in beside it.
   function showSkeleton() {
+    // Tells the shared one in base.html to stand down. This page names the real stages
+    // as they run, which the generic skeleton cannot.
+    window.__skeletonShown = true;
     var main = document.querySelector("main");
     var panel = document.createElement("div");
     panel.id = "analysing";

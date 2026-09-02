@@ -388,3 +388,28 @@ select {
 @media (prefers-reduced-motion: reduce) {
   .sk { animation: none; background: var(--panel-2); }
 }
+
+/* ------------------------------------------------------- the page-level skeleton */
+
+/* Every screen here is server rendered, so a click on a nav item or a submit button
+   leaves the old page sitting there while the server works. On a fast route that is
+   invisible. On a route that reads the inbox or calls a model it looks like the click
+   did not register, and the honest response to that is to click again. So any
+   navigation the server has to think about paints a skeleton of where it is going.
+   It borrows main's own width and padding so the real page lands where the skeleton
+   was rather than jumping. */
+.sk-page { max-width: 1000px; margin: 0 auto; padding: 28px 24px 80px; }
+
+.sk-title { height: 19px; width: 200px; }
+.sk-card  { height: 76px; }
+.sk-row   { height: 52px; margin-bottom: 10px; }
+.sk-row:last-child { margin-bottom: 0; }
+
+/* Said out loud rather than implied by a moving box, because a skeleton says work is
+   happening and this says which work. Screen readers get it through role=status. */
+.sk-what {
+  font-size: 13px;
+  color: var(--muted);
+  margin: 12px 0 20px;
+  letter-spacing: 0.01em;
+}

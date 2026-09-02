@@ -127,6 +127,162 @@
     b.setAttribute("aria-label", b.title);
   }
   paintThemeButton();
+
+  // ------------------------------------------------------- the loading skeleton
+  //
+  // Nothing here is a single page app. Every click posts to the server and waits for
+  // HTML back, and on the routes that read the inbox or call a model that wait is
+  // seconds, not milliseconds. Until the new page arrives the old one sits there
+  // looking untouched, which reads as a click that missed, so the click gets repeated
+  // and the work gets done twice. This paints where the click is going instead.
+  //
+  // Two rules it must not break. It never touches main.innerHTML: replacing the DOM
+  // while a submit is in flight removes the form being submitted and the browser
+  // abandons the navigation, so main is hidden and the skeleton goes in beside it.
+  // And it never fires on a link that does not navigate, because a download or a new
+  // tab leaves the skeleton with nothing to be replaced by.
+
+  var SK_DELAY = 160;      // fast routes finish inside this and never flash a skeleton
+  var SK_GIVE_UP = 300000; // two model calls, each allowed its own two minutes
+
+  // What is loading, keyed by the path being asked for. Longest match wins, so the
+  // model-backed posts beat the page they sit on.
+  var SK_LABELS = [
+    ["/job/alerts/sync",   "Reading your inbox"],
+    ["/job/alerts/clear",  "Clearing those"],
+    ["/job/details/import","Reading the file"],
+    ["/job/writer/spec",   "Reading the spec"],
+    ["/job/scan",          "Checking your inbox for replies"],
+    ["/rewrite",           "Rewriting against the job"],
+    ["/cover",             "Writing the cover letter"],
+    ["/gaps",              "Working out what closes the gap"],
+    ["/job/alerts",        "Job Alerts"],
+    ["/job/tracker",       "Tracker"],
+    ["/job/writer",        "Resume and Cover"],
+    ["/job/details",       "My Details"],
+    ["/job/brief",         "Interview Brief"],
+    ["/posts",             "Post Writer"],
+    ["/job",               "Dashboard"]
+  ];
+
+  function skLabel(path) {
+    for (var i = 0; i < SK_LABELS.length; i++) {
+      if (path.indexOf(SK_LABELS[i][0]) !== -1) { return SK_LABELS[i][1]; }
+    }
+    return "Loading";
+  }
+
+  // Three shapes, matched to the three kinds of screen. A skeleton that does not
+  // resemble what arrives is worse than none, because the page then jumps.
+  function skShape(path) {
+    if (path === "/job" || path === "/") { return "cards"; }
+    if (path.indexOf("/job/alerts") === 0 || path.indexOf("/job/tracker") === 0) { return "list"; }
+    return "panels";
+  }
+
+  function skLines(widths) {
+    return widths.map(function (w) {
+      return '<div class="sk sk-line w' + w + '"></div>';
+    }).join("");
+  }
+
+  function skBody(shape) {
+    if (shape === "cards") {
+      return '<div class="cards">' +
+             '<div class="sk sk-card"></div><div class="sk sk-card"></div>' +
+             '<div class="sk sk-card"></div><div class="sk sk-card"></div></div>' +
+             '<div class="panel">' + skLines([40, 90, 75, 60]) + '</div>' +
+             '<div class="panel">' + skLines([50, 85, 70]) + '</div>';
+    }
+    if (shape === "list") {
+      return '<div class="panel">' +
+             '<div class="sk sk-row"></div><div class="sk sk-row"></div>' +
+             '<div class="sk sk-row"></div><div class="sk sk-row"></div>' +
+             '<div class="sk sk-row"></div><div class="sk sk-row"></div></div>';
+    }
+    return '<div class="panel">' + skLines([60, 90, 75]) + '</div>' +
+           '<div class="split">' +
+           '<div class="panel">' + skLines([40, 100, 80, 65]) + '</div>' +
+           '<div class="panel">' + skLines([40, 100, 70, 85]) + '</div></div>' +
+           '<div class="panel">' + skLines([50, 100, 95, 80]) + '</div>';
+  }
+
+  var skTimer = null, skGiveUp = null;
+
+  function showPageSkeleton(path) {
+    if (window.__skeletonShown) { return; }
+    window.__skeletonShown = true;
+
+    skTimer = setTimeout(function () {
+      var main = document.querySelector("main");
+      if (!main) { return; }
+      var panel = document.createElement("div");
+      panel.className = "sk-page";
+      panel.id = "pageSkeleton";
+      panel.innerHTML =
+        '<div class="sk sk-line sk-title"></div>' +
+        '<p class="sk-what" role="status" aria-live="polite">' + skLabel(path) + '...</p>' +
+        skBody(skShape(path));
+
+      main.style.display = "none";
+      main.parentNode.insertBefore(panel, main);
+
+      // The page it was standing in for is gone, so if the answer never comes there is
+      // nothing left to fall back to and this animates forever. A screen that claims to
+      // be working when nothing is working is worse than an error.
+      skGiveUp = setTimeout(function () {
+        panel.innerHTML =
+          '<div class="notice bad"><strong>No answer from the app.</strong>' +
+          '<p style="margin: 6px 0 0;">Five minutes is long past normal, so something ' +
+          'is stuck. Quit Job App from the Dock and open it again.</p></div>' +
+          '<div class="actions"><a class="button" href="/job">Back to the dashboard</a></div>';
+      }, SK_GIVE_UP);
+    }, SK_DELAY);
+  }
+
+  function hidePageSkeleton() {
+    clearTimeout(skTimer);
+    clearTimeout(skGiveUp);
+    window.__skeletonShown = false;
+    // The writer's own skeleton is cleared here too. Both are frozen on a back
+    // navigation and neither page gets a chance to clear its own.
+    ["pageSkeleton", "analysing"].forEach(function (id) {
+      var panel = document.getElementById(id);
+      if (panel) { panel.remove(); }
+    });
+    var main = document.querySelector("main");
+    if (main) { main.style.display = ""; }
+  }
+
+  // Going back lands on a cached page with the skeleton still frozen over it. This is
+  // the only way to hear about that, because nothing re-runs on a bfcache restore.
+  window.addEventListener("pageshow", function (e) {
+    if (e.persisted) { hidePageSkeleton(); }
+  });
+
+  document.addEventListener("click", function (e) {
+    if (e.defaultPrevented || e.button !== 0) { return; }
+    if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) { return; }
+    var a = e.target.closest ? e.target.closest("a[href]") : null;
+    if (!a) { return; }
+    if (a.target || a.hasAttribute("download") || a.dataset.noSkeleton !== undefined) { return; }
+    // A route that answers with a file never navigates, so the skeleton it left behind
+    // would never be cleared.
+    if (a.pathname && a.pathname.indexOf("/download") !== -1) { return; }
+    if (a.origin !== window.location.origin) { return; }
+    // A jump inside the page is not a load.
+    if (a.pathname === window.location.pathname && a.hash) { return; }
+    showPageSkeleton(a.pathname);
+  });
+
+  document.addEventListener("submit", function (e) {
+    if (e.defaultPrevented) { return; }
+    var form = e.target;
+    // The writer paints its own, with the real stages named as they run.
+    if (form.hasAttribute("data-analyse") || form.dataset.noSkeleton !== undefined) { return; }
+    var action = form.getAttribute("action") || window.location.pathname;
+    showPageSkeleton(action);
+  });
 </script>
 </body>
 </html>
