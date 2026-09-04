@@ -40,6 +40,14 @@ Return exactly this shape:
 }
 
 Rules:
+- HARD LIMITS on size. At most 12 entries in "must", at most 8 in "nice", at most 25 in
+  "keywords". Keep every "text" under 100 characters, trimming the posting's wording
+  rather than quoting a whole sentence. These are budgets, not targets: a posting with
+  six real requirements should return six. A reply that runs long is cut off in transit
+  and the whole extraction is lost, so a short complete answer beats a full one that
+  never arrives.
+- Rank by how hard the posting leans on each one and keep the heaviest. If you have to
+  drop something, drop from "nice" first.
 - "must" is what the JD states as required. "nice" is preferred or desirable.
 - weight is 0.0 to 1.0 and reflects how heavily the JD leans on that requirement.
 - keyword must be the short form an applicant tracking system matches on, for example
@@ -215,7 +223,7 @@ def extract(jd_text: str) -> Extraction:
         # JSON, cut off mid-string, reported as "did not return parseable JSON". It was a
         # budget. Sized for the most verbose model on the list rather than the one
         # currently routed, the same way tailor's ceiling was.
-        max_tokens=6000,
+        max_tokens=9000,
         temperature=0.1,
     )
 

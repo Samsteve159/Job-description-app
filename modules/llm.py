@@ -296,11 +296,15 @@ def complete_json(
     # wrong thing: it reads as a model that cannot follow a schema, when the model
     # followed it exactly and ran out of room. Saying which costs one line and saves the
     # next person an hour.
+    # Balance, not the last character. The first version of this asked whether the reply
+    # ended with a closing brace, which a truncated reply very often does: output cut off
+    # inside a list stops just after some inner object's `}` and looked complete. Counting
+    # openers against closers catches that. Braces inside string values can skew the count
+    # in principle, and it only ever decides which error message to print, so a wrong
+    # guess costs nothing that matters.
     body = raw.strip()
-    truncated = (
-        body.startswith(("{", "["))
-        and not body.endswith(("}", "]"))
-        and len(body) > 200
+    truncated = body.startswith(("{", "[")) and (
+        body.count("{") > body.count("}") or body.count("[") > body.count("]")
     )
     if truncated:
         raise LLMError(

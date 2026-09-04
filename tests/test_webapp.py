@@ -355,6 +355,42 @@ with TestClient(app) as client:
                     follow_redirects=True)
     check("an empty value is refused", "cannot be empty" in r.text)
 
+    print("\ntruncated JSON says it was truncated")
+    from modules.llm import LLMError, complete_json  # noqa: E402
+    import modules.llm as _llm  # noqa: E402
+
+    def _fake(reply):
+        return lambda stage, system, user, max_tokens=0, temperature=0: reply
+
+    real = _llm.complete
+    try:
+        # Cut off just after an inner closing brace, which is where a real truncation
+        # usually lands and which the first version of this check read as complete.
+        _llm.complete = _fake('{"must": [{"text": "a requirement", "weight": 1.0}, '
+                              '{"text": "another one half writ')
+        try:
+            complete_json("extract", "s", "u")
+            check("truncated JSON raises", False, "no exception")
+        except LLMError as exc:
+            check("truncated JSON raises", True)
+            check("and blames the budget, not the schema",
+                  "max_tokens" in str(exc) and "stops mid-value" in str(exc), str(exc)[:90])
+
+        _llm.complete = _fake("I am afraid I cannot help with that.")
+        try:
+            complete_json("extract", "s", "u")
+            check("genuine prose still raises", False, "no exception")
+        except LLMError as exc:
+            check("genuine prose still raises", True)
+            check("and is not blamed on the budget",
+                  "max_tokens" not in str(exc), str(exc)[:90])
+
+        _llm.complete = _fake('```json\n[{"title": "wrapped in a list"}]\n```')
+        check("a lone object in a list is unwrapped",
+              complete_json("extract", "s", "u") == {"title": "wrapped in a list"})
+    finally:
+        _llm.complete = real
+
     print("\nwriting tells on the review screen")
     db = next(get_db())
     pkg2 = Package(job_text="Spend analysis role.", company="Acme", title="Stiff",
