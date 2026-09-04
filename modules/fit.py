@@ -29,6 +29,8 @@ from typing import Any, Dict, List, Optional, Sequence
 
 from modules import keywords as kw
 
+from modules import house
+
 log = logging.getLogger(__name__)
 
 RED, AMBER, GREEN = "red", "amber", "green"
@@ -365,6 +367,18 @@ def assess(extraction: Any, placement: Any, facts: Sequence[Any],
         fit.advice.append("Will not clear the parser yet. See the ATS check.")
     if fit.band == RED and not unbacked:
         fit.advice.append("Not fixable by writing. Spend the evening elsewhere.")
+
+    # A posting can be a clean keyword match and still be about work he has never done.
+    # People analytics is the case that made this worth checking: it reads as analytics
+    # all the way down, scores respectably on the terms, and is a domain with no entry on
+    # his record at all. Said out loud, because a low score with no reason attached looks
+    # like the writer having an off day rather than the job being wrong.
+    off = house.off_target_domain(getattr(extraction, "jd_text", "") or "", must)
+    if off:
+        fit.advice.insert(0, (
+            "This job is in " + ", ".join(off) + ", which you have not worked in. "
+            "Nothing here can write your way into it."
+        ))
 
     log.info("fit: %d/100 (%s) for %r", fit.score, fit.band,
              getattr(extraction, "title", "") or "this job")

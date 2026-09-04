@@ -261,5 +261,34 @@ check("a month between roles is not a gap",
       not _has_study_gap([Role("Mar 2015", "Mar 2018"), Role("Apr 2018")]))
 check("a single role cannot have one", not _has_study_gap([Role("Dec 2023")]))
 
+print("\nqualifications he does not hold")
+for claim in ["MBA, London Business School",
+              "Master of Business Administration, 2023",
+              "CFA Level III candidate"]:
+    b, reason = _validate(Block("education", claim, [20], "verified"), KNOWN)
+    check(f"blocked: {claim[:38]}", b.grade == "blocked", reason or "allowed through")
+
+b, reason = _validate(
+    Block("education", "Master of Business Analytics", [20], "verified"), KNOWN)
+check("the degree he actually holds passes", b.grade != "blocked", reason)
+
+print("\ndomains with no entry on the record")
+for claim in ["Six years of experience in logistics across the region.",
+              "Background in people analytics and workforce planning.",
+              "Deep knowledge of FMCG distribution economics."]:
+    b, reason = _validate(Block("experience", claim, [20], "verified"), KNOWN)
+    check(f"blocked: {claim[:38]}", b.grade == "blocked", reason or "allowed through")
+
+# The distinction the whole guard turns on. He prices freight, so the word survives and
+# the claim does not.
+b, reason = _validate(
+    Block("experience", "Priced the logistics category inside the wider spend base.",
+          [20], "verified"), KNOWN)
+check("real work keeps the domain word", b.grade != "blocked", reason)
+b, reason = _validate(
+    Block("experience", "Built the reporting pack the HR function also consumed.",
+          [20], "verified"), KNOWN)
+check("and so does work a banned function merely touched", b.grade != "blocked", reason)
+
 print(f"\n{passed} passed, {failed} failed")
 raise SystemExit(1 if failed else 0)

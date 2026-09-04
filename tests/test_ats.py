@@ -227,6 +227,62 @@ try:
 except AtsBlocked as exc:
     ok("gate allows a passing report", False, str(exc)[:60])
 
+print("\nhis own formatting rules")
+
+import zipfile  # noqa: E402
+from docx import Document as _Doc  # noqa: E402
+from modules import house  # noqa: E402
+from modules.render_docx import audit as _audit  # noqa: E402
+
+path = build(summary="Rebuilt the taxonomy for a national retail client using SQL.")
+with zipfile.ZipFile(path) as zf:
+    doc_xml = zf.read("word/document.xml").decode()
+ok("body text is justified", 'w:val="both"' in doc_xml,
+   "he asked for this explicitly and overrode the advice against it")
+ok("and the document still clears the parser", _audit(path)["ok"])
+ok("a client descriptor pulls in the withheld line",
+   house.WITHHELD_LINE in _audit(path)["text"])
+
+plain = build(summary="Wrote SQL against the spend cube.",
+              roles=[Role("Data Analyst", "Purchasing Index", "Dec 2023 - Present",
+                          bullets=["Ran spend analysis in SQL."])])
+ok("and a document naming no engagement does not carry it",
+   house.WITHHELD_LINE not in _audit(plain)["text"])
+
+# The footer rule used to be "never". It is now "not contact details", because a name and
+# a page number are already in the body and losing them costs nothing.
+long_bullet = ("Rebuilt the category taxonomy across 40,000 line items and held it "
+               "through two quarterly refreshes without a break in the series. ")
+two_pager = build(roles=[Role("Data Analyst", "Purchasing Index", "Dec 2023 - Present",
+                              bullets=[long_bullet] * 34)])
+with zipfile.ZipFile(two_pager) as zf:
+    footers = [n for n in zf.namelist()
+               if n.startswith("word/footer") and n.endswith(".xml")]
+    footer_xml = zf.read(footers[0]).decode() if footers else ""
+ok("a two-pager gets a footer", bool(footers))
+ok("it carries the name and a live page number",
+   "Jane Doe" in footer_xml and "PAGE" in footer_xml, footer_xml[:80])
+ok("and that footer is not held against it", _audit(two_pager)["ok"],
+   str(_audit(two_pager)["problems"]))
+
+one_pager = build(roles=[Role("Data Analyst", "Purchasing Index", "Dec 2023 - Present",
+                              bullets=["Ran spend analysis in SQL."])])
+with zipfile.ZipFile(one_pager) as zf:
+    ok("a one-pager gets none",
+       not any(n.startswith("word/footer") and n.endswith(".xml") for n in zf.namelist()))
+
+# What the blanket ban was actually protecting, which must still be caught.
+doc = _Doc()
+doc.add_paragraph("Body")
+doc.sections[0].footer.paragraphs[0].text = "jane@example.com  +61 400 000 000"
+leaky = OUT / "_leak.docx"
+doc.save(str(leaky))
+report = _audit(leaky)
+ok("contact details in a footer are still refused", not report["ok"])
+ok("and the message names what would be lost",
+   any("contact details" in p for p in report["problems"]), str(report["problems"]))
+leaky.unlink(missing_ok=True)
+
 (OUT / "_t.docx").unlink(missing_ok=True)
 print(f"\n{passed} passed, {failed} failed")
 raise SystemExit(1 if failed else 0)

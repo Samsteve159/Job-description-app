@@ -29,7 +29,7 @@ from config import config
 from database.db import get_db
 from database.models import (DismissedAlert, GeneratedBlock, Package,
                              ProfileFact)
-from modules import cover, fit, gaps, tracker
+from modules import cover, fit, gaps, house, tracker
 from modules import contact as contact_module
 from modules import design
 from modules import keywords as kwmod
@@ -374,8 +374,17 @@ def _package_view(request: Request, db: Session, package: Package,
     ).lower()
     hit_keywords = {k for k in extraction.must_keywords() if k and k in rendered}
 
+    # Style faults, read off the bullets that would actually be exported. Reported and
+    # never enforced: a stiff sentence is worth a second pass and is not a reason to
+    # refuse a document, which is the line between this and the truth gates above.
+    tells = house.natural_language([
+        b.text for b in shown
+        if b.section == "experience" and (b.grade == "verified" or b.accepted)
+    ])
+
     contact_module.bootstrap(db)
     return render(request, "review.html", section="writer", _db=db,
+                  writing_tells=tells,
                   placement=package.placement or {},
                   cover=_cover_from(package) if package.cover else None,
                   fit=package.fit or {},

@@ -26,7 +26,11 @@ from typing import Dict, List, Optional
 
 from docx import Document
 from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx.oxml.ns import qn
+from docx.oxml import OxmlElement
 from docx.shared import Pt, RGBColor
+
+from modules import house
 
 BODY_FONT = "Calibri"
 BODY_SIZE = Pt(10.5)
@@ -170,6 +174,13 @@ def _configure(doc: Document) -> None:
     pf.space_before = Pt(0)
     pf.space_after = Pt(2)
     pf.line_spacing = 1.05
+    # He asked for justified body text and overrode the usual advice against it. The
+    # advice is about ragged word spacing, and he has seen it and made the call, so this
+    # is settled and not to be raised again. Headings, role titles, date lines and the
+    # header stay left aligned, which is handled at each call site rather than here.
+    pf.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+    # A single line stranded across a page break reads as a document nobody looked at.
+    pf.widow_control = True
 
     for section in doc.sections:
         section.top_margin = Pt(40)
@@ -180,6 +191,7 @@ def _configure(doc: Document) -> None:
 
 def _heading(doc: Document, text: str) -> None:
     p = doc.add_paragraph()
+    p.paragraph_format.alignment = WD_ALIGN_PARAGRAPH.LEFT
     p.paragraph_format.space_before = Pt(12)
     p.paragraph_format.space_after = Pt(4)
     run = p.add_run(text.upper())
@@ -190,8 +202,15 @@ def _heading(doc: Document, text: str) -> None:
 
 
 def _line(doc: Document, text: str, bold: bool = False, muted: bool = False,
-          size: Optional[Pt] = None, space_before: int = 0) -> None:
+          size: Optional[Pt] = None, space_before: int = 0,
+          justify: bool = False) -> None:
     p = doc.add_paragraph()
+    # Only running prose is justified. A role title or a date line justified to the
+    # margin is stretched whitespace with nothing gained, which is the failure mode the
+    # advice against justification is actually about.
+    p.paragraph_format.alignment = (
+        WD_ALIGN_PARAGRAPH.JUSTIFY if justify else WD_ALIGN_PARAGRAPH.LEFT
+    )
     if space_before:
         p.paragraph_format.space_before = Pt(space_before)
     run = p.add_run(plain_text(text))
@@ -203,6 +222,7 @@ def _line(doc: Document, text: str, bold: bool = False, muted: bool = False,
 
 def _bullet(doc: Document, text: str) -> None:
     p = doc.add_paragraph(style="List Bullet")
+    p.paragraph_format.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
     p.paragraph_format.space_after = Pt(3)
     run = p.add_run(plain_text(text))
     run.font.name = BODY_FONT
@@ -235,16 +255,16 @@ def render_resume(payload: ResumePayload, out_path: Path) -> Path:
 
     if payload.summary:
         _heading(doc, SECTION_HEADINGS["summary"])
-        _line(doc, payload.summary)
+        _line(doc, payload.summary, justify=True)
 
     if payload.skill_groups or payload.skills:
         _heading(doc, SECTION_HEADINGS["skills"])
         if payload.skill_groups:
             for label, terms in payload.skill_groups:
                 if terms:
-                    _line(doc, f"{label}: " + " | ".join(terms))
+                    _line(doc, f"{label}: " + " | ".join(terms), justify=True)
         else:
-            _line(doc, " | ".join(payload.skills))
+            _line(doc, " | ".join(payload.skills), justify=True)
 
     if payload.experience:
         _heading(doc, SECTION_HEADINGS["experience"])
@@ -266,11 +286,97 @@ def render_resume(payload: ResumePayload, out_path: Path) -> Path:
         for item in payload.certifications:
             _line(doc, item)
 
+    # Every engagement on the record is named by descriptor because the client names
+    # belong to his employer. Without this line a reader takes "a national QSR chain" for
+    # vagueness rather than discretion, and vagueness is the more expensive reading.
+    if _names_an_engagement(payload):
+        _line(doc, house.WITHHELD_LINE, muted=True, size=Pt(8.5), space_before=10)
+
+    if _runs_past_one_page(payload):
+        _page_footer(doc, payload.name)
+
     doc.save(str(out_path))
     return out_path
 
 
+# Characters of body text that fit on one page at 10.5pt with these margins. Measured off
+# a rendered two-pager rather than calculated, and it is an estimate: python-docx does not
+# lay out pages, so nothing here can know the real count. It only decides whether a footer
+# is worth adding, and the cost of being wrong either way is one redundant line.
+_CHARS_PER_PAGE = 3600
+
+
+def _runs_past_one_page(payload: "ResumePayload") -> bool:
+    body = [payload.summary or ""] + list(payload.skills or [])
+    for role in payload.experience or []:
+        body.append(role.title or "")
+        body.extend(role.bullets or [])
+    body.extend(payload.education or [])
+    return sum(len(x) for x in body) > _CHARS_PER_PAGE
+
+
+def _page_footer(doc: Document, name: str) -> None:
+    """Name and page number, on documents that run to a second page.
+
+    The rule elsewhere in this file is that nothing goes in a footer, because a parser
+    that skips one loses whatever was in it. That rule is about contact details. A name
+    and a page number are a safety net for the printed copy: if a parser drops them
+    nothing is lost, because both are already in the body. So the ban stays for contact
+    details and lifts for these two, and `audit` checks the distinction rather than the
+    presence of a footer.
+    """
+    footer = doc.sections[0].footer
+    para = footer.paragraphs[0] if footer.paragraphs else footer.add_paragraph()
+    para.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+    run = para.add_run(plain_text(name) + "    ")
+    run.font.name = BODY_FONT
+    run.font.size = Pt(8.5)
+    run.font.color.rgb = MUTED
+
+    # A live page number is a field, and python-docx has no wrapper for one, so the three
+    # runs Word expects are written by hand.
+    field = para.add_run()
+    field.font.name = BODY_FONT
+    field.font.size = Pt(8.5)
+    field.font.color.rgb = MUTED
+    begin = OxmlElement("w:fldChar")
+    begin.set(qn("w:fldCharType"), "begin")
+    instr = OxmlElement("w:instrText")
+    instr.set(qn("xml:space"), "preserve")
+    instr.text = "PAGE"
+    end = OxmlElement("w:fldChar")
+    end.set(qn("w:fldCharType"), "end")
+    for node in (begin, instr, end):
+        field._r.append(node)
+
+
+def _names_an_engagement(payload: "ResumePayload") -> bool:
+    """Whether anything in the document stands in for a client name."""
+    text = " ".join(
+        [payload.summary or ""]
+        + [b for role in (payload.experience or []) for b in (role.bullets or [])]
+    ).lower()
+    return any(marker in text for marker in _ENGAGEMENT_MARKERS)
+
+
+# The descriptors the facts use in place of a client name. Each is a phrase the writing
+# only produces when it is standing in for one.
+_ENGAGEMENT_MARKERS = (
+    "a national", "an asx-listed", "a top-5", "a top-five", "an australian",
+    "a multinational", "a global", "client", "an fmcg", "a listed",
+)
+
+
 # ------------------------------------------------------------------------ ATS audit
+
+# An email, a phone number or a profile URL. The three things that must never be the only
+# copy of themselves, and the only three that made the old blanket footer ban worth having.
+_CONTACT_IN_CHROME = re.compile(
+    r"[\w.+-]+@[\w-]+\.[\w.]+"
+    r"|\+?\d[\d\s().-]{7,}\d"
+    r"|(?:linkedin\.com|github\.com)/[\w/-]+",
+    re.I,
+)
 
 HOSTILE_TAGS = {
     "w:tbl": "table",
@@ -351,6 +457,13 @@ def audit(path: Path) -> Dict[str, object]:
     with zipfile.ZipFile(path) as zf:
         xml = zf.read("word/document.xml").decode("utf-8", "replace")
         names = zf.namelist()
+        # Read inside the with. The first version of this reached for zf further down the
+        # function, by which point the archive was closed.
+        chrome = "\n".join(
+            zf.read(n).decode("utf-8", "replace")
+            for n in names
+            if n.startswith(("word/header", "word/footer"))
+        )
 
     doc = Document(str(path))
     text = "\n".join(p.text for p in doc.paragraphs)
@@ -359,10 +472,19 @@ def audit(path: Path) -> Dict[str, object]:
     for tag, label in HOSTILE_TAGS.items():
         if f"<{tag}" in xml:
             problems.append(f"contains {label} ({tag})")
-    if any(n.startswith("word/header") for n in names):
-        problems.append("contains a header")
-    if any(n.startswith("word/footer") for n in names):
-        problems.append("contains a footer")
+    # The rule used to be "no header or footer at all". That was the right rule when the
+    # only reason to have one was contact details, which a parser that skips the footer
+    # silently deletes. A name and a page number are different: both are already in the
+    # body, so a parser dropping them costs nothing, and on a printed two-pager they are
+    # what keeps page two attached to page one. So the check moved from where the content
+    # sits to what the content is.
+    if chrome:
+        lost = _CONTACT_IN_CHROME.findall(chrome)
+        if lost:
+            problems.append(
+                "contact details in a header or footer, which a parser may drop: "
+                + ", ".join(sorted({m.lower() for m in lost})[:4])
+            )
     if len(doc.tables) > 0:
         problems.append(f"{len(doc.tables)} table(s) via python-docx")
     for bad in PUNCTUATION_MAP:

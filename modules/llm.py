@@ -57,19 +57,33 @@ def _call_nim(model: str, system: str, user: str, max_tokens: int, temperature: 
     for attempt, pause in enumerate(_RATE_LIMIT_BACKOFF + (None,)):
         try:
             return _nim_once(model, system, user, max_tokens, temperature)
-        except _RateLimited as exc:
+        except (_RateLimited, httpx.TimeoutException) as exc:
+            # A read timeout is the same condition arriving a different way: the model is
+            # busy, not gone. It used to fall straight through to the paid route without
+            # a single retry.
             if pause is None:
                 raise LLMError(
-                    f"NIM rate limited after {len(_RATE_LIMIT_BACKOFF)} retries: {exc}"
+                    f"NIM unavailable after {len(_RATE_LIMIT_BACKOFF)} retries: "
+                    f"{type(exc).__name__}: {exc}"
                 ) from exc
-            log.info("NIM rate limited on %s, waiting %.0fs (retry %d of %d)",
-                     model, pause, attempt + 1, len(_RATE_LIMIT_BACKOFF))
+            log.info("NIM said try later on %s (%s), waiting %.0fs (retry %d of %d)",
+                     model, type(exc).__name__, pause, attempt + 1,
+                     len(_RATE_LIMIT_BACKOFF))
             time.sleep(pause)
     raise LLMError("unreachable")
 
 
 class _RateLimited(Exception):
     """NIM said try later. Internal: never escapes _call_nim."""
+
+
+# 503 and 429 are the same sentence in different words: not now, try again. 502 and 504
+# are a gateway between here and the model, not the model itself. All four are transient
+# and none of them is a reason to start paying, which is what falling through to the
+# fallback means. Seen the day the routes were re-pointed: the replacement model answered
+# a run cleanly, then returned "Service temporarily overloaded" on the next one and sent
+# both stages to Anthropic.
+_TRY_AGAIN = {429, 502, 503, 504}
 
 
 def _nim_once(model: str, system: str, user: str, max_tokens: int, temperature: float) -> str:
@@ -90,8 +104,8 @@ def _nim_once(model: str, system: str, user: str, max_tokens: int, temperature: 
         },
         timeout=_TIMEOUT,
     )
-    if resp.status_code == 429:
-        raise _RateLimited(resp.text[:120])
+    if resp.status_code in _TRY_AGAIN:
+        raise _RateLimited(f"HTTP {resp.status_code}: {resp.text[:110]}")
     if resp.status_code >= 400:
         raise LLMError(f"NIM HTTP {resp.status_code}: {resp.text[:300]}")
     data = resp.json()
@@ -108,6 +122,25 @@ def _nim_once(model: str, system: str, user: str, max_tokens: int, temperature: 
 # is a moving target and a stale constant fails closed on a route meant to be the safety
 # net. First call for a model pays one retry, the rest of the process skips the parameter.
 _NO_TEMPERATURE = set()
+
+# Extended thinking is adaptive, and its tokens come out of the same max_tokens budget as
+# the answer. On a small prompt Claude does not use it and nothing looks wrong. On this
+# app's tailor prompt, 19k of system instructions plus a house spec, it spent all 12,000
+# tokens reasoning and returned a reply with no text block in it at all. That is a total
+# failure, not a degraded one, and it cost a paid call to produce nothing.
+#
+# Turned off rather than budgeted for, because the budget cannot be raised: past a
+# certain size the SDK demands streaming. With it off the same call answers in 2,480
+# tokens. Nothing here needs it. Every stage asks for JSON against an explicit contract,
+# which is instruction following, and the truth guards do not care how hard the model
+# thought.
+_NO_THINKING_PARAM = set()
+
+
+def _rejects_thinking(exc: Exception) -> bool:
+    text = str(exc).lower()
+    return "thinking" in text and ("unexpected" in text or "unsupported" in text
+                                   or "not supported" in text or "unrecognized" in text)
 
 
 def _rejects_temperature(exc: Exception) -> bool:
@@ -131,18 +164,44 @@ def _call_anthropic(model: str, system: str, user: str, max_tokens: int, tempera
     }
     if model not in _NO_TEMPERATURE:
         kwargs["temperature"] = temperature
+    if model not in _NO_THINKING_PARAM:
+        kwargs["thinking"] = {"type": "disabled"}
 
-    try:
-        msg = client.messages.create(**kwargs)
-    except Exception as exc:  # noqa: BLE001 - narrowed immediately by _rejects_temperature
-        if "temperature" not in kwargs or not _rejects_temperature(exc):
+    # Two parameters, each of which some model somewhere refuses, and refusing is a 400
+    # that takes the whole route down. Learned once for temperature and applied to both:
+    # drop the parameter, remember the model, and let the rest of the process skip it.
+    def _create():
+        try:
+            return client.messages.create(**kwargs)
+        except Exception as exc:  # noqa: BLE001 - narrowed by the two _rejects_ helpers
+            if "thinking" in kwargs and _rejects_thinking(exc):
+                log.info("%s rejects thinking, retrying without it and remembering", model)
+                _NO_THINKING_PARAM.add(model)
+                kwargs.pop("thinking")
+                return _create()
+            if "temperature" in kwargs and _rejects_temperature(exc):
+                log.info("%s rejects temperature, retrying without it and remembering", model)
+                _NO_TEMPERATURE.add(model)
+                kwargs.pop("temperature")
+                return _create()
             raise
-        log.info("%s rejects temperature, retrying without it and remembering", model)
-        _NO_TEMPERATURE.add(model)
-        kwargs.pop("temperature")
-        msg = client.messages.create(**kwargs)
 
-    return "".join(b.text for b in msg.content if getattr(b, "type", "") == "text")
+    msg = _create()
+
+    text = "".join(b.text for b in msg.content if getattr(b, "type", "") == "text")
+    # "empty response" on its own is a dead end. There are three different reasons the
+    # text can come back empty and they need three different fixes: the budget was too
+    # small, the model declined, or it answered in a block type this does not read.
+    # Saying which one turns a mystery into a one-line change.
+    if not text.strip():
+        kinds = sorted({getattr(b, "type", "?") for b in msg.content}) or ["no blocks"]
+        raise LLMError(
+            f"no text in the reply. stop_reason={msg.stop_reason} "
+            f"blocks={','.join(kinds)} "
+            f"in={getattr(msg.usage, 'input_tokens', '?')} "
+            f"out={getattr(msg.usage, 'output_tokens', '?')} of max_tokens={max_tokens}"
+        )
+    return text
 
 
 _PROVIDERS = {"nim": _call_nim, "anthropic": _call_anthropic}
@@ -229,13 +288,47 @@ def complete_json(
 
     for candidate in candidates:
         try:
-            return json.loads(candidate)
+            return _unwrap(stage, json.loads(candidate))
         except (json.JSONDecodeError, TypeError):
             continue
 
+    # "did not return parseable JSON" is true of a truncated reply and points at the
+    # wrong thing: it reads as a model that cannot follow a schema, when the model
+    # followed it exactly and ran out of room. Saying which costs one line and saves the
+    # next person an hour.
+    body = raw.strip()
+    truncated = (
+        body.startswith(("{", "["))
+        and not body.endswith(("}", "]"))
+        and len(body) > 200
+    )
+    if truncated:
+        raise LLMError(
+            f"stage={stage} returned JSON that stops mid-value after {len(raw)} chars, "
+            f"which means max_tokens={max_tokens} was too small for this model rather "
+            f"than the model failing the schema. Last 120 chars: {raw[-120:]!r}"
+        )
     raise LLMError(
         f"stage={stage} did not return parseable JSON. First 300 chars: {raw[:300]!r}"
     )
+
+
+def _unwrap(stage: str, data: Any) -> Any:
+    """Coerce the one wrong shape that is unambiguous: a lone object in a list.
+
+    Every stage in this app asks for an object and every one of them raises on anything
+    else. Models differ on whether the answer to "return an object" is `{...}` or
+    `[{...}]`, and the difference is a wrapper rather than a disagreement about content,
+    so unwrapping loses nothing. Found when the routes moved off a retired model and the
+    replacement returned a list on a prompt the old one had answered with an object.
+
+    Narrow on purpose. A list of two is a real difference in shape and is passed through
+    to fail loudly at the call site, because guessing there would be guessing at content.
+    """
+    if isinstance(data, list) and len(data) == 1 and isinstance(data[0], dict):
+        log.info("stage=%s returned its object wrapped in a list, unwrapping", stage)
+        return data[0]
+    return data
 
 
 def health() -> Dict[str, str]:

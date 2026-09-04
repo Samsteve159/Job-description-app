@@ -27,8 +27,10 @@ from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 
 from config import config
 from modules import keywords
+from modules import house
 from modules.llm import complete_json
-from modules.prompts import ATS_CONTRACT, HOUSE_STYLE, NO_HEADCOUNT, TRUTH_CONTRACT
+from modules.prompts import (ATS_CONTRACT, HOUSE_STYLE, NATURAL_LANGUAGE,
+                            NEVER_CLAIM, NO_HEADCOUNT, TRUTH_CONTRACT)
 from modules.render_docx import ResumePayload, Role
 
 log = logging.getLogger(__name__)
@@ -58,6 +60,10 @@ words the job description uses.
 {ATS_CONTRACT}
 
 {NO_HEADCOUNT}
+
+{NEVER_CLAIM}
+
+{NATURAL_LANGUAGE}
 
 {HOUSE_STYLE}
 
@@ -319,6 +325,26 @@ def _validate(block: Block, known: Dict[int, Any],
     if _HEADCOUNT.search(block.text):
         block.grade = "blocked"
         return block, "headcount or team-leadership claim"
+
+    # 4. no qualification he does not hold. Blocked rather than downgraded, because a
+    # degree is the one claim a background check verifies exactly and the substitution a
+    # model reaches for is always the more famous one: two masters become an MBA.
+    degrees = house.claims_a_degree(block.text)
+    if degrees:
+        block.grade = "blocked"
+        log.warning("INVENTED QUALIFICATION: %s. Text: %r", degrees, block.text[:90])
+        return block, "claims a qualification not held: " + ", ".join(degrees)
+
+    # 5. no experience in a domain he has never worked in. Matched only inside a frame
+    # that asserts experience, so a bullet that prices freight keeps the word logistics
+    # and a bullet claiming years in logistics does not.
+    domains = house.claims_a_domain(block.text)
+    if domains:
+        block.grade = "blocked"
+        log.warning("UNWORKED DOMAIN: %s. Text: %r",
+                    [d for d, _ in domains], block.text[:90])
+        return block, ("claims experience in " + ", ".join(sorted({d for d, _ in domains}))
+                       + ", which is not on the record")
 
     if block.grade not in GRADES or block.grade == "blocked":
         block.grade = "inferred"

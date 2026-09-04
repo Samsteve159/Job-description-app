@@ -143,7 +143,11 @@
   // tab leaves the skeleton with nothing to be replaced by.
 
   var SK_DELAY = 160;      // fast routes finish inside this and never flash a skeleton
-  var SK_GIVE_UP = 300000; // two model calls, each allowed its own two minutes
+  // Raised from five minutes once NIM started retrying transient overloads instead of
+  // falling straight through to the paid route. Three retries with backoff is worth
+  // waiting for and can put a two-stage run near six minutes, so a five-minute give-up
+  // was about to start calling working runs dead.
+  var SK_GIVE_UP = 480000;
 
   // What is loading, keyed by the path being asked for. Longest match wins, so the
   // model-backed posts beat the page they sit on.
@@ -233,7 +237,7 @@
       skGiveUp = setTimeout(function () {
         panel.innerHTML =
           '<div class="notice bad"><strong>No answer from the app.</strong>' +
-          '<p style="margin: 6px 0 0;">Five minutes is long past normal, so something ' +
+          '<p style="margin: 6px 0 0;">Eight minutes is long past normal, so something ' +
           'is stuck. Quit Job App from the Dock and open it again.</p></div>' +
           '<div class="actions"><a class="button" href="/job">Back to the dashboard</a></div>';
       }, SK_GIVE_UP);

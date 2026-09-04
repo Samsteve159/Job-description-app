@@ -91,6 +91,51 @@ nothing that was working.
 
 What replaces it: he pastes a URL or the text. Which is what he was doing regardless.
 
+## Two files hold house rules, and they are not interchangeable
+
+`modules/design.py` holds the specs he uploads. Those say how a resume should be written
+in general, and they change as convention changes: inside a year the single-page rule
+became entry-level advice and keyword repetition went from free to penalised. They belong
+in a file he can replace without anyone editing Python.
+
+`modules/house.py` holds what is true about him. Which degrees he has, which domains have
+no entry on his record, what his scope actually was. That does not change between jobs and
+must not be re-decided by a model on every run.
+
+The split matters because the two need opposite treatment. A style rule is advisory and a
+document that breaks one still goes out. A claim about his qualifications is not advisory,
+and a document that breaks one must not exist. Putting them in one file would mean either
+enforcing style faults, which blocks good documents, or advising truth rules, which is how
+a claim reaches a background check.
+
+Three properties every rule in `house.py` has:
+
+- it is about him, not about resumes
+- it is checkable against real output, or it is a prompt line and belongs in `prompts.py`
+- it can only ever remove or downgrade a claim, so a bug there makes the writing more
+  cautious and never less true
+
+The domain ban is the one worth reading twice. It forbids the claim and not the word: he
+prices freight, so "reduced logistics spend" is real work and survives, while "six years
+in logistics" is a sentence about somebody else and is blocked. The first version banned
+the noun and would have deleted true bullets. Same lesson as `_NOT_ALONE` in
+`keywords.py`, learned the same way.
+
+## The footer ban narrowed rather than being overruled
+
+The original rule was that a generated document has no header or footer at all, because a
+parser that skips one silently deletes whatever was in it. His own rule asks for a footer
+carrying his name and the page number on a two-pager.
+
+Both are right about different things. The risk the ban existed for is losing content that
+exists nowhere else, which means contact details. A name and a page number are already in
+the body, so a parser dropping them costs nothing, and on a printed two-pager they are what
+keeps page two attached to page one.
+
+So the check moved from where content sits to what the content is. `render_docx.audit` now
+refuses an email, a phone number or a profile URL in a header or footer, and allows a name
+and a page field. The protection is unchanged and the rule is satisfied.
+
 ## Not built
 
 - Fabricated experience of any kind

@@ -58,9 +58,15 @@ STAGES = (
 # about a second. Availability beats benchmark scores: a model that will not answer is not
 # fast. Left here as a comment rather than deleted, because free-tier throttling moves and
 # it may be worth re-probing later.
-NIM_FAST = "openai/gpt-oss-20b"                    # 1.0s, answered every call
-NIM_MAIN = "openai/gpt-oss-120b"                   # 3.2s tailor, fastest on the hard task
-NIM_BIG = "nvidia/nemotron-3-super-120b-a12b"      # slower but a large MoE, bake-off candidate
+# Re-picked 3 Sep 2026. openai/gpt-oss-120b, which every main stage ran on, reached end
+# of life at 08:00 UTC that morning and started answering 410 Gone. Nothing warned; the
+# first sign was every stage falling through to the paid fallback in one session. The
+# replacement was chosen the same way as the last one, by sending real work: 6 of the 14
+# ids on the key's own listing returned 404 when actually invoked, which is why a listing
+# is never trusted on its own.
+NIM_FAST = "openai/gpt-oss-20b"                    # 18.0s tailor, still answering
+NIM_MAIN = "nvidia/nemotron-3-super-120b-a12b"     # 10.8s tailor, held the citation shape
+NIM_BIG = "nvidia/nemotron-3-ultra-550b-a55b"      # passes extract, 503s under load
 PAID_PROVIDERS = ("anthropic",)
 DEFAULT_CLAUDE_MODEL = "claude-sonnet-5"
 

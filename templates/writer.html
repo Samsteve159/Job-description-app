@@ -234,22 +234,22 @@
     // nothing left to fall back to and it animates forever. Found the honest way: the
     // server had died and this sat there looking busy. A stuck screen that claims to be
     // working is worse than an error.
-    // Two model calls, each allowed 120s of its own, so this only fires when something
-    // is genuinely dead rather than merely slow. The old 120s window gave up on runs
-    // that were still working, and told him to check a terminal a desktop app does not
-    // have.
+    // Two model calls, each of which now retries a NIM overload three times with
+    // backoff rather than falling through to a paid call. That is worth waiting for and
+    // it moves the worst case to about six minutes, so the window is eight. It only
+    // fires when something is genuinely dead rather than merely slow.
     setTimeout(function () {
       clearInterval(ticker);
       panel.innerHTML =
         '<div class="notice bad"><strong>Giving up on this one.</strong>' +
-        '<p style="margin: 6px 0 0;">Five minutes without an answer means a model call ' +
+        '<p style="margin: 6px 0 0;">Eight minutes without an answer means a model call ' +
         'is stuck or the app has stopped. Quit Job App from the Dock, open it again, ' +
         'and paste the job once more.</p>' +
         '<p style="margin: 6px 0 0;">It may still finish in the background. Check the ' +
         'recent list on the form before redoing the work. If this keeps happening, the ' +
         'reason is in Library/Logs/JobApp.log</p></div>' +
         '<div class="actions"><a class="button" href="/job/writer">Back to the form</a></div>';
-    }, 300000);
+    }, 480000);
   }
 </script>
 {% endblock %}

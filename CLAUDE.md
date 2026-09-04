@@ -1,4 +1,4 @@
-# Job_App — working notes for Claude
+# Job_App, working notes for Claude
 
 A local macOS app that runs the user's India job search. Three sections, one of which is
 deliberately isolated from the other two.
@@ -103,8 +103,23 @@ lives elsewhere.
 5. **Never assume a model id exists.** Every id first configured from a published guide was
    dead on contact, and several models the account's own /models endpoint lists return 404
    when invoked. Pick with `scripts/probe_models.py`, confirm with `scripts/check_models.py`,
-   and record what you found. Listing is not the same as callable.
-6. **There is no scout and no VM worker.** Jobs arrive as a pasted JD or a URL, nothing else.
+   and record what you found. Listing is not the same as callable. This has now happened
+   three times, most recently when the model every primary stage ran on went 410 Gone
+   mid-session with no warning. Assume it will happen again and re-probe rather than
+   guessing a replacement.
+6. **What may never be claimed lives in `modules/house.py`, and it is enforced.** Two
+   masters degrees and specifically not an MBA, because a background check verifies the
+   exact title. No experience in HR, workforce, field operations, marketplace, mobility,
+   quick commerce, logistics or FMCG, none of which appear on the record. The ban is on
+   the claim and not on the word: pricing freight keeps "logistics" and "six years in
+   logistics" is blocked. Do not widen it to bare nouns; that was the first version and
+   it deleted true bullets.
+7. **Style rules and truth rules get opposite treatment.** `house.natural_language` reports
+   and never blocks, because a stiff sentence is not a lie. `house.claims_a_degree` and
+   `house.claims_a_domain` block at `tailor._validate`. Do not move either across the line.
+8. **Justified body text is settled.** He asked for it and overrode the advice against it.
+   Headings, role titles and date lines stay left aligned. Do not raise it again.
+9. **There is no scout and no VM worker.** Jobs arrive as a pasted JD or a URL, nothing else.
    Do not add job-board adapters or a second machine without asking. Dropped 29 Aug 2026;
    the reasoning is in `DECISIONS.md`.
 
@@ -127,6 +142,11 @@ letting it run on Claude.
 
 ## Flags
 
+Extended thinking is disabled on the Anthropic path. Its tokens come out of the same
+`max_tokens` budget as the answer, and on the tailor prompt it spent all of it reasoning
+and returned no text at all. Raising the budget is not the fix: past a certain size the
+SDK requires streaming. See `ERROR_LOG.md`.
+
 `STRICT_NUMBERS` (default true) blocks any figure not present in the facts a block cites.
 It only fires on invented numbers. His call whether it stays on; do not argue it again.
 
@@ -138,7 +158,9 @@ It only fires on invented numbers. His call whether it stays on; do not argue it
 config.py              env, per-stage LLM routing, fail fast on structure not credentials
 database/models.py     two table families that must not touch (see SPEC.md)
 modules/llm.py         provider router. complete() and complete_json()
-modules/prompts.py     HOUSE_STYLE, TRUTH_CONTRACT, NO_HEADCOUNT
+modules/prompts.py     HOUSE_STYLE, TRUTH_CONTRACT, NO_HEADCOUNT, NEVER_CLAIM
+modules/house.py       what is true about him. Degrees, unworked domains, writing tells
+modules/design.py      the specs he uploads. How a resume is written, not what is true
 modules/extract.py     JD text to a typed Extraction
 modules/tailor.py      facts + requirements to graded blocks, then to_payload()
 modules/render_docx.py the truth gate, ATS-safe writer, and audit()
@@ -149,6 +171,7 @@ scripts/check_models.py  verify routes resolve. --list shows what the key can re
 scripts/probe_models.py  rank candidate models on real work. --task extract|tailor
 tests/test_guards.py     truthfulness guards. A plain script, not pytest
 tests/test_ats.py        the ATS gate, against real rejection modes
+tests/test_house.py      his standing rules. Mostly negative cases, which are the point
 ```
 
 ## Conventions carried over from an earlier production system

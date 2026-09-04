@@ -9,6 +9,19 @@
   &middot; <a href="/job/writer">start another</a>
 </p>
 
+{% if writing_tells %}
+{# Style, not truth. A separate, quieter notice from the ones that stop an export, so the
+   difference between "fix this or it does not go out" and "this reads a bit stiff" is
+   visible at a glance rather than only in the wording. #}
+<div class="notice warn">
+  <strong>How it reads</strong>
+  <ul>{% for t in writing_tells %}<li>{{ t }}</li>{% endfor %}</ul>
+  <p style="margin: 6px 0 0; color: var(--muted);">
+    None of this blocks the export. Rewrite the bullet in your own words if it bothers you.
+  </p>
+</div>
+{% endif %}
+
 {% if contact_warnings %}
 <div class="notice warn">
   <strong>Before you send this</strong>

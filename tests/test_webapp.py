@@ -176,9 +176,11 @@ with TestClient(app) as client:
     check("the stages named are the real ones",
           "cites a fact" in r.text and "Scoring the fit" in r.text)
     check("and it gives up rather than animating forever",
-          "Giving up on this one" in r.text and "300000" in r.text)
+          "Giving up on this one" in r.text and "480000" in r.text)
     # It used to give up at 120s while two model calls were still legitimately running,
-    # and told him to check a terminal that a desktop app does not have.
+    # and told him to check a terminal that a desktop app does not have. Then at 300s,
+    # which stopped being long enough once NIM overloads started being retried three
+    # times with backoff rather than falling through to a paid call.
     check("it waits longer than the two model calls it is waiting on",
           "120000" not in r.text and "Check the terminal" not in r.text)
     check("giving up says what to actually do about it",
@@ -352,6 +354,36 @@ with TestClient(app) as client:
     r = client.post("/job/details/set", data={"kind": "phone", "value": ""},
                     follow_redirects=True)
     check("an empty value is refused", "cannot be empty" in r.text)
+
+    print("\nwriting tells on the review screen")
+    db = next(get_db())
+    pkg2 = Package(job_text="Spend analysis role.", company="Acme", title="Stiff",
+                   extraction={"title": "Stiff", "must": [], "nice": [], "keywords": []},
+                   status="draft")
+    db.add(pkg2)
+    db.flush()
+    # Four bullets of near-identical length, which is the tell no real career produces.
+    for i, text in enumerate([
+        "Built the model and shipped it out",
+        "Wrote the queries and ran them all",
+        "Made the deck and gave the talk on",
+        "Ran the numbers and sent them over",
+    ]):
+        db.add(GeneratedBlock(package_id=pkg2.id, section="experience",
+                              org="Purchasing Index", text=text, fact_ids=[4],
+                              grade="verified", order_index=i))
+    db.commit()
+    stiff_id = pkg2.id
+    db.close()
+
+    r = client.get(f"/job/writer/{stiff_id}")
+    check("uniform bullets raise a notice", "How it reads" in r.text)
+    check("and it says what is wrong", "Uniform length" in r.text or "uniform" in r.text)
+    check("without blocking the export",
+          "does not block" in r.text or "None of this blocks" in r.text)
+
+    r = client.get(f"/job/writer/{pid}")
+    check("varied bullets raise nothing", "How it reads" not in r.text)
 
     print("\nloading skeleton")
     page = client.get("/job").text

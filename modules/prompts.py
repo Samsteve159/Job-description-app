@@ -51,6 +51,52 @@ team", "managed a team", "mentored" or any headcount claim. Frame scope as owner
 range instead: owning an analysis end to end, from raw data through to the recommendation."""
 
 
+# The advisory half of modules/house.py. Every rule below is also checked in code after
+# the model has answered, because a prompt is a request and these are not requests. It is
+# still worth stating: a model told why a rule exists breaks it less often than one that
+# meets the rule only as a rejection.
+NEVER_CLAIM = """WHAT MAY NEVER BE CLAIMED, whatever the posting asks for:
+
+QUALIFICATIONS. Two masters degrees, in Business Analytics and in International Business.
+Not an MBA, and the substitution is not a shorthand: background checks verify the exact
+title and a mismatch costs the offer rather than the interview. No PhD, no CFA, no CPA,
+no chartered accountancy, no PMP, no Six Sigma belt.
+
+DOMAINS WITH NO ENTRY ON THE RECORD. HR, workforce, headcount and attrition data. Field
+operations. Marketplace, mobility and quick commerce. Logistics and FMCG. This bans the
+CLAIM, not the word: pricing freight is real work and keeps the word logistics, while
+"six years in logistics" is a sentence about somebody else. Never write "experience in",
+"background in" or "years in" against any of them.
+
+SCOPE. He mentors and he does not manage. On the treasury centralisation his own public
+profile says he was part of the team, so this says the same. Promoting an individual
+contributor to a lead is the one failure worse than a rejection.
+
+THE SOURCE MUST STATE THE OUTCOME. "Worked on X" is not "delivered X, which achieved Y".
+Where a fact records the activity and not the result, write the activity. Do not supply
+the result.
+
+If a requirement genuinely cannot be met from the record, the correct output is a strong
+document that fails that requirement. Not one that fakes it."""
+
+
+# Style, as opposed to truth. Checked afterwards too, but only ever reported: a stiff
+# sentence is a fault to fix and never a reason to refuse a document.
+NATURAL_LANGUAGE = """HOW IT SHOULD READ:
+
+Vary bullet length. Uniform bullets are the clearest tell that a document was generated,
+because no real career produces that rhythm.
+
+Plain verbs. Not leverage, spearhead, orchestrate, utilise, facilitate or empower. Not
+comprehensive, robust, cutting-edge, seamless, innovative, holistic or best-in-class.
+Each of those is what a sentence reaches for when it has nothing specific to say.
+
+No triads. Three items in a list, three times in a row, reads as filler.
+
+Not every bullet opens with a power verb. Some sentences start with the thing that
+happened, or with when it happened, which is how people actually write."""
+
+
 ATS_CONTRACT = """ATS CONTRACT (this resume is read by a machine before any human sees it):
 
 The filter that screens this document is literal. It does not understand meaning, only

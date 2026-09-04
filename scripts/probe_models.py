@@ -28,20 +28,24 @@ from config import config  # noqa: E402
 TIMEOUT = 45.0
 
 CANDIDATES = [
+    # Re-picked 3 Sep 2026, the morning openai/gpt-oss-120b went 410 Gone. Everything
+    # here was on the key's own /models listing that day, which is a necessary and not a
+    # sufficient condition: the listing has offered 404s before, so the probe still
+    # sends real work before anything is routed to it.
+    "deepseek-ai/deepseek-v4-pro-0813",
     "deepseek-ai/deepseek-v4-flash-0731",
-    "moonshotai/kimi-k2.6",
     "moonshotai/kimi-k3",
+    "moonshotai/kimi-k2.6",
+    "minimaxai/minimax-m3",
+    "nvidia/nemotron-3-ultra-550b-a55b",
     "nvidia/nemotron-3-super-120b-a12b",
     "nvidia/nemotron-3.5-lightning-30b-a3b",
-    "nvidia/nemotron-3-nano-30b-a3b",
-    "nvidia/llama-3.3-nemotron-super-49b-v1.5",
-    "meta/llama-3.3-70b-instruct",
-    "openai/gpt-oss-120b",
-    "openai/gpt-oss-20b",
-    "writer/palmyra-fin-70b-32k",
+    "nvidia/nemotron-nano-3-30b-a3b",
+    "nvidia/llama-3.1-nemotron-ultra-253b-v1",
+    "nvidia/llama-3.1-nemotron-70b-instruct",
     "mistralai/mistral-large-2-instruct",
-    "minimaxai/minimax-m3",
-    "stepfun-ai/step-3.7-flash",
+    "mistralai/mistral-nemotron",
+    "openai/gpt-oss-20b",
 ]
 
 JD = """Manager, Procurement Analytics. Mumbai, hybrid. A global capability centre of a

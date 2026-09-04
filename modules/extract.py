@@ -209,7 +209,13 @@ def extract(jd_text: str) -> Extraction:
         "extract",
         system=_SYSTEM,
         user=f"Job description:\n\n{jd_text[:20000]}",
-        max_tokens=3000,
+        # 3000 was enough for the model this ran on until Sep 2026 and is not enough for
+        # its replacement, which writes noticeably longer requirement text for the same
+        # posting. The failure looked like a model that could not follow a schema: valid
+        # JSON, cut off mid-string, reported as "did not return parseable JSON". It was a
+        # budget. Sized for the most verbose model on the list rather than the one
+        # currently routed, the same way tailor's ceiling was.
+        max_tokens=6000,
         temperature=0.1,
     )
 
