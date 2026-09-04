@@ -184,6 +184,11 @@ class Package(Base):
     placement = Column(JSON, default=dict)
     # the fit score and the components behind it, so the number can always be argued with
     fit = Column(JSON, default=dict)
+    # what the writing loop actually did: which field it wrote for, what each round was
+    # given and what it returned, and which requirements it could not answer from the
+    # record. Stored rather than recomputed because it is a history of the run and there
+    # is no way to derive it after the fact
+    writer_run = Column(JSON, default=dict)
     # the drafted cover letter: paragraphs, what each cites, and what was refused
     cover = Column(JSON, default=dict)
     resume_path = Column(Text, nullable=True)

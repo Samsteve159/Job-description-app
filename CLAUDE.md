@@ -119,7 +119,13 @@ lives elsewhere.
    `house.claims_a_domain` block at `tailor._validate`. Do not move either across the line.
 8. **Justified body text is settled.** He asked for it and overrode the advice against it.
    Headings, role titles and date lines stay left aligned. Do not raise it again.
-9. **There is no scout and no VM worker.** Jobs arrive as a pasted JD or a URL, nothing else.
+9. **The writer is a loop, and the loop may never loosen a gate.** `modules/agent.py`
+   tailors, reads which requirements no bullet answers and which blocks the gates
+   refused, and sends only those back for repair. Every replacement goes through the same
+   `tailor._validate`. A round can produce a better sentence; it can never produce
+   permission. A round that returns nothing is the correct outcome on a real gap, so do
+   not "fix" the loop by making it retry harder.
+10. **There is no scout and no VM worker.** Jobs arrive as a pasted JD or a URL, nothing else.
    Do not add job-board adapters or a second machine without asking. Dropped 29 Aug 2026;
    the reasoning is in `DECISIONS.md`.
 
@@ -163,6 +169,9 @@ modules/house.py       what is true about him. Degrees, unworked domains, writin
 modules/design.py      the specs he uploads. How a resume is written, not what is true
 modules/extract.py     JD text to a typed Extraction
 modules/tailor.py      facts + requirements to graded blocks, then to_payload()
+modules/agent.py       the writing loop. Repairs what the posting asked for and the
+                       draft does not answer. Cannot loosen a gate
+modules/families.py    which field a posting is in, and what that reader screens on
 modules/render_docx.py the truth gate, ATS-safe writer, and audit()
 modules/ats.py         the ATS gate. simulate_parse(), check(), gate()
 data/profile_facts.json  the career source of truth. Hand-edit, then re-seed

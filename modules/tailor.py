@@ -754,3 +754,103 @@ def to_payload(
         education=verbatim("education"),
         certifications=verbatim("cert"),
     )
+
+
+# --------------------------------------------------------------------- the revision pass
+
+_REVISE_SYSTEM = """You are fixing specific faults in a resume that is otherwise written.
+
+You are given requirements from the posting that no bullet currently answers, and bullets
+that were refused by the checks. Write replacements for those and nothing else. Do not
+rewrite the document. Do not restate what already works.
+
+Return JSON only, no preamble and no code fence:
+
+{"bullets": [{"org": "the employer this belongs under", "text": "the bullet",
+              "fact_ids": [1, 2], "grade": "verified|inferred|stretch",
+              "answers": "the requirement it is meant to satisfy"}]}
+
+THE RULE THAT MATTERS MOST HERE. You may return fewer bullets than there are
+requirements, and for a requirement no fact supports you must return nothing at all. A
+requirement left unanswered is reported to the candidate as a genuine gap, which is
+useful and true. A requirement answered by a sentence the record does not support is
+caught by the same checks that refused the last attempt, so it wastes a round and, if it
+somehow passed, would be the one failure worse than a rejection. When you are unsure
+whether a fact supports a claim, leave the claim out.
+
+Every bullet cites the fact ids it draws on. A bullet citing nothing is discarded."""
+
+
+def revise(extraction: Any, facts: Sequence[Any], unanswered: Sequence[str],
+           rejected: Sequence[Tuple[Any, str]], house_spec: str = "",
+           family_guidance: str = "") -> Tuple[List[Block], List[Tuple[Block, str]]]:
+    """One focused repair pass. Returns (accepted blocks, rejected blocks with reasons).
+
+    Deliberately small. The first design re-ran the whole tailor call each round, which
+    on the free route meant three minutes per round and produced a different document
+    every time, so improvements in one part arrived alongside regressions in another.
+    Sending only the faults keeps a round to seconds and leaves everything that already
+    passed exactly as it was.
+    """
+    known = {f.id: f for f in facts}
+    citable = [f for f in facts if getattr(f, "verified", True)]
+    if not unanswered and not rejected:
+        return [], []
+
+    parts = []
+    if unanswered:
+        parts.append(
+            "REQUIREMENTS WITH NO BULLET ANSWERING THEM. Write one bullet for each that "
+            "the facts genuinely support, and skip the rest:\n"
+            + "\n".join(f"- {term}" for term in unanswered)
+        )
+    if rejected:
+        # The reason matters more than the text. A block refused for an invented number
+        # needs the number removed, not a different sentence.
+        lines = []
+        for block, reason in rejected[:8]:
+            lines.append(f"- REFUSED ({reason}): {getattr(block, 'text', '')[:200]}")
+        parts.append(
+            "BULLETS THE CHECKS REFUSED. Each reason is exact. Fix that specific fault, "
+            "or leave the bullet out if it cannot be fixed honestly:\n" + "\n".join(lines)
+        )
+
+    user = (
+        f"TARGET ROLE: {extraction.title or 'unspecified'}\n\n"
+        + "\n\n".join(parts)
+        + f"\n\nROLES:\n{_roles_block(citable)}"
+        + f"\n\nFACTS (cite these by the id in square brackets):\n{_facts_block(citable)}"
+    )
+
+    system = _REVISE_SYSTEM
+    if family_guidance:
+        system += "\n\n" + family_guidance
+    if house_spec:
+        system += house_spec
+
+    data = complete_json("tailor", system=system, user=user,
+                         max_tokens=6000, temperature=0.3)
+    if not isinstance(data, dict):
+        raise RuntimeError(f"revise returned {type(data).__name__}, expected an object")
+
+    actual_years = experience_years(facts)
+    accepted: List[Block] = []
+    refused: List[Tuple[Block, str]] = []
+    for entry in data.get("bullets") or []:
+        if not isinstance(entry, dict):
+            continue
+        text = str(entry.get("text") or "").strip()
+        if not text:
+            continue
+        ids = [int(i) for i in (entry.get("fact_ids") or []) if str(i).isdigit()]
+        grade = str(entry.get("grade") or "inferred").strip().lower()
+        block = Block("experience", text, ids,
+                      grade if grade in GRADES else "inferred",
+                      org=str(entry.get("org") or "").strip() or None)
+        # The same gates, unchanged. A revision is not a second chance at the truth
+        # rules, only at the wording, and routing around them here would undo the point
+        # of having them raise rather than filter.
+        checked, reason = _validate(block, known, actual_years)
+        (refused.append((checked, reason)) if reason else accepted.append(checked))
+
+    return accepted, refused

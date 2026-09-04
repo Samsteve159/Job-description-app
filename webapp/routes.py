@@ -29,7 +29,7 @@ from config import config
 from database.db import get_db
 from database.models import (DismissedAlert, GeneratedBlock, Package,
                              ProfileFact)
-from modules import cover, fit, gaps, house, tracker
+from modules import agent, cover, fit, gaps, house, tracker
 from modules import contact as contact_module
 from modules import design
 from modules import keywords as kwmod
@@ -282,9 +282,15 @@ def analyse(request: Request, db: Session = Depends(get_db),
 
     try:
         t0 = time.monotonic()
-        result = tailor(extraction, facts,
-                        house_spec=design.instruction(db, "resume"))
-        log.info("analyse: tailor took %.1fs", time.monotonic() - t0)
+        # Not a single tailoring call any more. The agent writes, reads which of the
+        # posting's requirements no bullet answers and which bullets the gates refused,
+        # and repairs only those, up to three rounds. Everything that passed is left
+        # alone, so the extra rounds cost seconds rather than re-running the document.
+        run = agent.write(extraction, facts,
+                          house_spec=design.instruction(db, "resume"))
+        result = run.result
+        log.info("analyse: writer took %.1fs across %d round(s), family=%s",
+                 time.monotonic() - t0, len(run.rounds), run.family)
     except (LLMError, RuntimeError) as exc:
         return render(request, "writer.html", section="writer", url=url, job_text=text,
                       error=f"The tailor stage failed: {exc}",
@@ -316,6 +322,7 @@ def analyse(request: Request, db: Session = Depends(get_db),
                        unanswered=kwmod.unanswered(extraction.must_keywords(),
                                                    result.blocks)),
         fit=_score_fit(db, extraction, result.placement, None),
+        writer_run=run.as_dict(),
         status="draft",
     )
     db.add(package)
@@ -386,6 +393,7 @@ def _package_view(request: Request, db: Session, package: Package,
     return render(request, "review.html", section="writer", _db=db,
                   writing_tells=tells,
                   placement=package.placement or {},
+                  writer_run=package.writer_run or {},
                   cover=_cover_from(package) if package.cover else None,
                   fit=package.fit or {},
                   fact_count=len(fact_rows),
@@ -600,9 +608,11 @@ def rewrite(request: Request, package_id: int, db: Session = Depends(get_db)):
 
     try:
         t0 = time.monotonic()
-        result = tailor(extraction, facts,
-                        house_spec=design.instruction(db, "resume"))
-        log.info("analyse: tailor took %.1fs", time.monotonic() - t0)
+        run = agent.write(extraction, facts,
+                          house_spec=design.instruction(db, "resume"))
+        result = run.result
+        log.info("rewrite: writer took %.1fs across %d round(s), family=%s",
+                 time.monotonic() - t0, len(run.rounds), run.family)
     except (LLMError, RuntimeError) as exc:
         return _package_view(request, db, package, error=str(exc),
                              error_title="Could not write it again")

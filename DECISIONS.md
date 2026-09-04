@@ -136,6 +136,56 @@ So the check moved from where content sits to what the content is. `render_docx.
 refuses an email, a phone number or a profile URL in a header or footer, and allows a name
 and a page field. The protection is unchanged and the rule is satisfied.
 
+## The writer is a loop, and what stops it being an agent that argues its way in
+
+The one-shot pipeline was honest and sometimes incomplete. When the gates refused a
+bullet, for an invented number or a citation that did not exist, the bullet was dropped
+and the requirement it was meant to answer went quietly unanswered. The page was always
+truthful and was occasionally missing the thing the posting cared about most, with
+nothing on screen saying so.
+
+The loop reads two signals the app already produced and never used together:
+`keywords.unanswered` for requirements with no bullet behind them, and
+`TailorResult.rejected` for what the gates threw out and why. It sends only those back.
+
+Three properties hold it in place.
+
+**It repairs, it does not rewrite.** The first design re-ran the whole tailoring call each
+round. On the free route that was minutes per round, and it produced a different document
+every time, so an improvement in one section arrived alongside a regression in another.
+Sending only the faults keeps a round to seconds. Measured on a live posting: 284s for the
+first pass, then 24s and 13s for the two repairs.
+
+**It cannot loosen a gate.** Every replacement goes through the same `tailor._validate` as
+the first pass. This is the property that makes the loop safe to have at all, and it is
+the one to check first if the loop is ever changed.
+
+**It can give up.** The repair prompt says in as many words that returning nothing for a
+requirement is correct when no fact supports it, and the loop stops as soon as a round
+adds nothing. A requirement his record does not cover has no honest bullet, and a loop
+that kept pushing until something got through would be a machine for defeating the gates
+one attempt at a time. On the live run it stopped after two repairs and reported
+"budgetary management" as a real gap.
+
+## Fields, not one house voice
+
+The pipeline wrote the same way for every posting. A consulting reader and a data reader
+want different evidence about the same piece of work, and a bullet that satisfies one
+reads as beside the point to the other. The same real project:
+
+    data        rebuilt a 40,000 line taxonomy in SQL, cutting unmatched spend to 2%
+    consulting  found the unmatched spend and built the value case that reached the CFO
+
+Neither is a stretch and neither is the other reworded. `modules/families.py` picks the
+field from the title and the required terms, deterministically, and adds what that
+reader screens on to the writing instruction. A model asked to classify the posting would
+be one more thing that can be wrong on a run, and the signal is already sitting in the
+title.
+
+Markers match ordinary word endings. Exact matching read a bank's business manager role as
+a data job, because "budgetary" failed to match "budget" and "processes" failed to match
+"process", leaving the two data terms as the only ones scoring.
+
 ## Not built
 
 - Fabricated experience of any kind

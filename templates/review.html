@@ -30,6 +30,25 @@
 </div>
 {% endif %}
 
+{% if writer_run and writer_run.rounds %}
+<div class="panel tight">
+  <p class="hint" style="margin: 0;">
+    Written for a <strong>{{ writer_run.family }}</strong> reader
+    {%- if writer_run.rounds|length > 1 %}, over {{ writer_run.rounds|length }} rounds
+    {%- else %}, in one pass{% endif %},
+    taking {{ writer_run.seconds }}s.
+    {% set fixed = writer_run.rounds[0].unanswered_before|length - writer_run.still_unanswered|length %}
+    {%- if fixed > 0 %}
+      It went back and answered {{ fixed }} requirement{{ 's' if fixed != 1 }} the first
+      draft had missed.
+    {%- elif writer_run.rounds|length > 1 %}
+      It tried again on what the first draft missed and found nothing your record backs,
+      which makes those genuine gaps rather than wording.
+    {%- endif %}
+  </p>
+</div>
+{% endif %}
+
 <!-- ------------------------------------------------------------------- fit score -->
 {% if fit %}
 <div class="panel fit-{{ fit.band }}">
@@ -145,11 +164,13 @@
 
   {% if placement.gaps %}
 {% if placement.unanswered %}
-  <h3 style="margin-top: 16px;">On the skills line, but not in a bullet</h3>
+  <h3 style="margin-top: 16px;">Still with no bullet behind them</h3>
   <p class="hint" style="margin-top: 0;">
     A screener checks the experience section against the requirement, so a term sitting in
-    a list proves nothing. These have no bullet standing behind them. Where the work is
-    real, rewrite a bullet to say so in the posting's own words.
+    a list proves nothing. The writer was given these and asked again
+    {% if writer_run and writer_run.rounds %}across {{ writer_run.rounds|length }} rounds{% endif %},
+    and returned nothing your record supports. Where the work is real and just described
+    differently, rewrite a bullet in the posting's own words.
   </p>
   <div class="pill-row">
     {% for term in placement.unanswered %}<span class="pill">{{ term }}</span>{% endfor %}
