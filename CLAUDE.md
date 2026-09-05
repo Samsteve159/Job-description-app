@@ -79,6 +79,19 @@ git grep --cached -niE "sameer|nando|nufarm|5ways|19\.3M|7\.35M" \
   | grep -vE "^CLAUDE.md:|^desktop/build_app.sh:"
 ```
 
+## Restarting the local server
+
+`pkill -f "python3 main.py"` does not match it. macOS runs it as
+`.../Python.app/Contents/MacOS/Python main.py`, so the pattern misses, the old process
+keeps port 8100, and the replacement exits without binding. Two days of live checks were
+read off a stale build that way while the tests, which build their own app object, were
+right the whole time.
+
+```bash
+pkill -f "main.py"; sleep 2; nohup python3 main.py >> ~/Library/Logs/JobApp.log 2>&1 &
+ps -ax | grep "[m]ain.py"     # confirm the start time before trusting a live page
+```
+
 ## Scope boundary
 
 **This directory is the whole project.** Do not read from, write to, or reference anything

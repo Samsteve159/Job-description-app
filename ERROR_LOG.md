@@ -2,6 +2,37 @@
 
 Incidents and their root causes. Newest first.
 
+## 2026-09-05: three must-have keywords could never go green
+
+The pills beside each requirement on the review screen were coloured by membership in
+`extraction.must_keywords()`, the scored keyword list. The pills themselves sit beside
+`extraction.must` and display `r.keyword`. Those are two different vocabularies produced
+by two different parts of extract.
+
+On a real posting, three of the six keywords on screen, "timely decisions", "risk
+management" and "risk and controls", were absent from the scored list, so they showed red
+permanently no matter what the document said. Two of them were written in full in the
+draft. A false gap is worse than no signal, because it sends him looking for evidence to
+close something that was never open.
+
+Fixed by deciding the colour from the document text rather than from which list a term
+came from, and by building the set from the keywords actually on screen.
+
+The same screen also had one colour doing two jobs. A keyword was red both when nothing
+in the record supported it and when it was written in a block he had not ticked yet. The
+first is a gap and the second is one click. There are three states now.
+
+## 2026-09-05: every server restart for two days was a silent no-op
+
+Restarts were being issued as `pkill -f "python3 main.py"`. On macOS the process shows up
+as `.../Python.app/Contents/MacOS/Python main.py`, so the pattern never matched. The old
+process kept port 8100, each new one failed to bind and exited without a sound, and every
+live check for two days was reading code from the previously running build.
+
+The test suite was never affected, since it builds its own app object, and it was the
+tests that were right each time the browser disagreed with them. Match on `main.py`
+alone, and check the process start time before trusting anything a live page says.
+
 ## 2026-09-03: the model every main stage ran on reached end of life mid-session
 
 `openai/gpt-oss-120b` stopped answering at 08:00 UTC and began returning 410 Gone with

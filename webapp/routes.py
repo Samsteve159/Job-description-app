@@ -375,11 +375,33 @@ def _package_view(request: Request, db: Session, package: Package,
     fact_rows = db.query(ProfileFact).all()
     facts = {f.id: f.text for f in fact_rows}
 
+    # Two things were wrong here and they compounded.
+    #
+    # The colouring was decided by membership in extraction.must_keywords(), which is the
+    # scored keyword list, while the pills on screen sit beside extraction.must and show
+    # r.keyword. Those are different vocabularies. Three of the six keywords displayed on
+    # one real posting, "timely decisions", "risk management" and "risk and controls",
+    # were not in the scored list at all, so they showed red permanently no matter what
+    # the document said. A false gap is worse than no signal: it sends him looking for
+    # evidence to close something that was never open.
+    #
+    # And a keyword could be red for two opposite reasons. Absent from the document
+    # because nothing in the record supports it, or present in a block he has not ticked
+    # yet. The first is a gap in the record and the second is one click.
+    #
+    # So both sets are now built from the keywords actually on screen, and decided by
+    # looking at the text rather than by asking which list a term came from.
     rendered = " ".join(
         b.text for b in shown
         if b.grade == "verified" or b.accepted
     ).lower()
-    hit_keywords = {k for k in extraction.must_keywords() if k and k in rendered}
+    written = " ".join(b.text for b in shown).lower()
+    on_screen = {k for k in extraction.must_keywords() if k}
+    on_screen |= {r.keyword for r in extraction.must if getattr(r, "keyword", None)}
+    hit_keywords = {k for k in on_screen if k.lower() in rendered}
+    pending_keywords = {
+        k for k in on_screen if k not in hit_keywords and k.lower() in written
+    }
 
     # Style faults, read off the bullets that would actually be exported. Reported and
     # never enforced: a stiff sentence is worth a second pass and is not a reason to
@@ -401,7 +423,8 @@ def _package_view(request: Request, db: Session, package: Package,
                   package=package, extraction=extraction,
                   must=extraction.must, nice=extraction.nice,
                   blocks=shown, rejected=rejected, facts=facts,
-                  hit_keywords=hit_keywords, report=report,
+                  hit_keywords=hit_keywords, pending_keywords=pending_keywords,
+                  report=report,
                   contact_warnings=contact_module.warnings(db),
                   error=error or None, message=message or None,
                   error_title=error_title or None, error_kind=error_kind or None)

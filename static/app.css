@@ -234,6 +234,9 @@ code { font: 13px ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--i
 }
 .pill.miss { background: var(--red-soft); color: var(--red); border-color: transparent; }
 .pill.hit { background: var(--accent-soft); color: var(--accent); border-color: transparent; }
+/* Written but not ticked. Amber because it is the same colour the blocks below use for
+   the same condition, and because the fix is a click rather than a career decision. */
+.pill.pending { background: var(--amber-soft); color: var(--amber); border-color: transparent; }
 
 .empty { text-align: center; padding: 46px 20px; color: var(--muted); }
 .empty h2 { margin-top: 0; }

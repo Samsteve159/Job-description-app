@@ -104,10 +104,25 @@
   <div class="split">
     <div>
       <h3>Must have</h3>
+      {% if pending_keywords %}
+      <p class="hint" style="margin-top: 0;">
+        Amber means the words are already written and sitting in a block you have not
+        ticked. Red means nothing in your record supports it, so it was never written.
+        One of those is a click and the other is a gap.
+      </p>
+      {% endif %}
       {% for r in must %}
         <div style="font-size: 14px; margin-bottom: 5px;">
           {{ r.text }}
-          {% if r.keyword %}<span class="pill {{ 'hit' if r.keyword in hit_keywords else 'miss' }}">{{ r.keyword }}</span>{% endif %}
+          {% if r.keyword %}
+            {% if r.keyword in hit_keywords %}
+              <span class="pill hit">{{ r.keyword }}</span>
+            {% elif r.keyword in pending_keywords %}
+              <span class="pill pending" title="Written, but in a block you have not ticked yet. Tick it below and this counts.">{{ r.keyword }} &middot; needs a tick</span>
+            {% else %}
+              <span class="pill miss" title="Nothing in your record supports this, so it was not written.">{{ r.keyword }}</span>
+            {% endif %}
+          {% endif %}
         </div>
       {% else %}<p class="hint">None extracted.</p>{% endfor %}
     </div>

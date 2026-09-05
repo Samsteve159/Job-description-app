@@ -355,6 +355,53 @@ with TestClient(app) as client:
                     follow_redirects=True)
     check("an empty value is refused", "cannot be empty" in r.text)
 
+    print("\nthe must-have pills")
+    db = next(get_db())
+    pkg3 = Package(
+        job_text="A credit role.", company="Acme", title="Credit Analyst",
+        extraction={"title": "Credit Analyst", "seniority": "mid",
+                    "archetype": "corporate",
+                    "keywords": ["financial analysis"],
+                    # The keyword shown beside each requirement and the scored keyword
+                    # list are different vocabularies. "timely decisions" appears only in
+                    # the first, which is exactly the case that used to show a false red.
+                    "must": [
+                        {"text": "Do financial analysis", "keyword": "financial analysis",
+                         "weight": 1.0, "kind": "must"},
+                        {"text": "Deliver timely decisions", "keyword": "timely decisions",
+                         "weight": 1.0, "kind": "must"},
+                        {"text": "Underwrite credit", "keyword": "credit underwriting",
+                         "weight": 1.0, "kind": "must"}],
+                    "nice": []},
+        status="draft")
+    db.add(pkg3)
+    db.flush()
+    db.add(GeneratedBlock(package_id=pkg3.id, section="experience", org="Acme",
+                          text="Ran financial analysis across the book.",
+                          fact_ids=[4], grade="verified", order_index=0))
+    # Written, but sitting in a block he has not ticked.
+    db.add(GeneratedBlock(package_id=pkg3.id, section="experience", org="Acme",
+                          text="Delivered timely decisions on escalations.",
+                          fact_ids=[4], grade="inferred", accepted=False, order_index=1))
+    db.commit()
+    pill_id = pkg3.id
+    db.close()
+
+    r = client.get(f"/job/writer/{pill_id}")
+
+    def pill_for(keyword):
+        m = re.search(r'<span class="pill (\w+)"[^>]*>\s*' + re.escape(keyword), r.text)
+        return m.group(1) if m else "absent"
+
+    check("a keyword in a verified block reads as hit",
+          pill_for("financial analysis") == "hit", pill_for("financial analysis"))
+    check("one written but not ticked reads as pending, not as a gap",
+          pill_for("timely decisions") == "pending", pill_for("timely decisions"))
+    check("and one nothing supports still reads as a gap",
+          pill_for("credit underwriting") == "miss", pill_for("credit underwriting"))
+    check("the screen says which of the two a colour means",
+          "One of those is a click and the other is a gap" in r.text)
+
     print("\ntruncated JSON says it was truncated")
     from modules.llm import LLMError, complete_json  # noqa: E402
     import modules.llm as _llm  # noqa: E402
